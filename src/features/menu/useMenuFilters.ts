@@ -1,0 +1,77 @@
+import { useState, useMemo } from 'react';
+import type { MenuItem, MenuFilters, LocationCode } from '../../types/menu';
+import { EATERY_LOCATIONS } from '../../types/menu';
+import { isAvailableAt } from '../../utils/locationParser';
+
+export function useMenuFilters(items: MenuItem[] | undefined, defaultLocation: LocationCode) {
+  const [filters, setFilters] = useState<MenuFilters>({
+    search: '',
+    category: '',
+    subCategory: '',
+    location: defaultLocation,
+  });
+
+  const categories = useMemo(() => {
+    if (!items) return [];
+    return [...new Set(items.map((i) => i.category).filter(Boolean))].sort();
+  }, [items]);
+
+  const subCategories = useMemo(() => {
+    if (!items) return [];
+    const source = filters.category
+      ? items.filter((i) => i.category === filters.category)
+      : items;
+    return [...new Set(source.map((i) => i.subCategory).filter(Boolean))].sort();
+  }, [items, filters.category]);
+
+  const filtered = useMemo(() => {
+    if (!items) return [];
+    let result = [...items];
+
+    if (filters.location !== 'ALL') {
+      result = result.filter((item) => isAvailableAt(item.locations, filters.location as LocationCode));
+    }
+
+    if (filters.category) {
+      result = result.filter((item) => item.category === filters.category);
+    }
+
+    if (filters.subCategory) {
+      result = result.filter((item) => item.subCategory === filters.subCategory);
+    }
+
+    if (filters.search.trim()) {
+      const q = filters.search.trim().toLowerCase();
+      result = result.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q) ||
+          item.subCategory.toLowerCase().includes(q),
+      );
+    }
+
+    return result;
+  }, [items, filters]);
+
+  const setSearch = (search: string) => setFilters((f) => ({ ...f, search }));
+  const setCategory = (category: string) =>
+    setFilters((f) => ({ ...f, category, subCategory: '' }));
+  const setSubCategory = (subCategory: string) => setFilters((f) => ({ ...f, subCategory }));
+  const setLocation = (location: LocationCode | 'ALL') =>
+    setFilters((f) => ({ ...f, location }));
+
+  const isEatery =
+    filters.location !== 'ALL' && EATERY_LOCATIONS.includes(filters.location as 'VD' | 'NW');
+
+  return {
+    filters,
+    filtered,
+    categories,
+    subCategories,
+    setSearch,
+    setCategory,
+    setSubCategory,
+    setLocation,
+    isEatery,
+  };
+}

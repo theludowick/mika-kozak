@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kozak Training Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Lora',Georgia,serif;background:#1a3328;color:#f5ead6;min-height:100vh}
+.hdr{background:#274b3a;border-bottom:3px solid #c4622d;padding:0 16px;position:sticky;top:0;z-index:100;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+.hdr-in{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:58px;flex-wrap:wrap;gap:6px}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.hdr-logo{width:34px;height:34px;background:#c4622d;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:15px;color:#f5ead6;font-weight:700;flex-shrink:0}
+.hdr-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:700}
+.hdr-sub{font-size:10px;color:rgba(245,234,214,.45);letter-spacing:.14em;text-transform:uppercase}
+.hdr-btn{padding:6px 12px;background:transparent;border:1px solid rgba(245,234,214,.22);border-radius:5px;color:rgba(245,234,214,.6);font-family:'Lora',serif;font-size:12px;cursor:pointer}
+.hdr-btn:hover{border-color:#c4622d;color:#d4784a}
+.page{max-width:820px;margin:0 auto;padding:26px 16px 80px}
+.slbl{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:#c4622d;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.slbl::after{content:'';flex:1;height:1px;background:rgba(196,98,45,.25)}
+.picker-wrap{max-width:640px;margin:0 auto;padding:60px 18px}
+.picker-title{font-family:'Playfair Display',serif;font-size:clamp(24px,4vw,34px);text-align:center;margin-bottom:6px}
+.picker-sub{text-align:center;font-size:13px;color:rgba(245,234,214,.5);margin-bottom:34px}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:30px}
+.pick-card{padding:16px 14px;border:1px solid rgba(245,234,214,.15);border-radius:10px;background:rgba(39,75,58,.32);cursor:pointer;text-align:center;transition:all .15s;position:relative}
+.pick-card:hover:not(.lk){border-color:#c4622d;background:rgba(39,75,58,.6)}
+.pick-card.on{border-color:#d4a843;background:rgba(212,168,67,.14)}
+.pick-card.lk{opacity:.4;cursor:not-allowed}
+.pick-card-lock{position:absolute;top:8px;right:9px;font-size:12px}
+.pick-card-code{font-size:10px;letter-spacing:.18em;color:rgba(245,234,214,.32);text-transform:uppercase;margin-bottom:3px}
+.pick-card-name{font-family:'Playfair Display',serif;font-size:15px}
+.pick-cta{display:flex;justify-content:center;margin-top:8px}
+.b-pri{padding:11px 24px;background:#c4622d;border:none;border-radius:6px;color:#f5ead6;font-family:'Playfair Display',serif;font-size:14px;font-weight:700;cursor:pointer}
+.b-pri:hover{background:#d4784a}
+.b-pri:disabled{opacity:.32;cursor:not-allowed}
+.b-gho{padding:10px 17px;background:transparent;border:1px solid rgba(245,234,214,.22);border-radius:6px;color:rgba(245,234,214,.72);font-family:'Lora',serif;font-size:14px;cursor:pointer}
+.b-gho:hover{border-color:#c4622d;color:#d4784a}
+.b-skip{padding:8px 13px;background:transparent;border:1px solid rgba(245,234,214,.09);border-radius:5px;color:rgba(245,234,214,.26);font-family:'Lora',serif;font-size:11px;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;margin-left:auto}
+.b-nxt{margin-top:17px;padding:10px 22px;background:transparent;border:1px solid #c4622d;border-radius:6px;color:#d4784a;font-family:'Playfair Display',serif;font-size:14px;cursor:pointer}
+.b-nxt:hover{background:rgba(196,98,45,.18)}
+.status-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;border-radius:8px;margin-bottom:18px;flex-wrap:wrap;font-size:12px}
+.status-bar.fresh{background:rgba(74,140,92,.12);border:1px solid rgba(74,140,92,.35);color:#a0dca0}
+.status-bar.stale{background:rgba(212,168,67,.08);border:1px solid rgba(212,168,67,.28);color:rgba(245,234,214,.65)}
+.status-bar.err{background:rgba(181,49,44,.1);border:1px solid rgba(181,49,44,.35);color:#e0a8a8}
+.status-bar b{color:#f5ead6}
+.status-btn{padding:5px 11px;border-radius:5px;border:1px solid rgba(245,234,214,.25);background:transparent;color:rgba(245,234,214,.7);font-size:11px;cursor:pointer;font-family:'Lora',serif;white-space:nowrap}
+.status-btn:hover{border-color:#c4622d;color:#d4784a}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.chip{padding:7px 13px;border-radius:8px;border:1px solid rgba(245,234,214,.13);background:rgba(39,75,58,.28);color:rgba(245,234,214,.55);font-family:'Lora',serif;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.chip.on{background:rgba(212,168,67,.14);border-color:#d4a843;color:#f5ead6}
+.chip-box{width:14px;height:14px;border-radius:3px;border:1px solid rgba(245,234,214,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px}
+.chip.on .chip-box{background:#d4a843;border-color:#d4a843;color:#1a3328}
+.start-row{display:flex;gap:10px;align-items:center;margin:16px 0 6px;flex-wrap:wrap}
+.qhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.qstat-pill{font-size:13px;color:rgba(245,234,214,.52);margin-right:13px}
+.qstat-pill strong{color:#f5ead6}
+.streak{color:#d4a843}
+.pbar-row{display:flex;align-items:center;gap:9px;margin-bottom:18px}
+.pbar-track{flex:1;height:3px;background:rgba(245,234,214,.08);border-radius:3px;overflow:hidden}
+.pbar-fill{height:100%;background:linear-gradient(90deg,#c4622d,#d4a843);transition:width .4s;border-radius:3px}
+.pbar-lbl{font-size:11px;color:rgba(245,234,214,.32)}
+.qcard{background:rgba(26,51,40,.88);border:1px solid rgba(245,234,214,.22);border-radius:13px;padding:26px 22px;position:relative}
+.qcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c4622d,transparent);opacity:.6}
+.qmeta{display:flex;align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap}
+.qcat{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#d4784a}
+.qtype{font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:3px;background:rgba(196,98,45,.18);color:#d4784a}
+.qtype.dim{background:transparent;color:rgba(245,234,214,.32)}
+.qloc{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;background:rgba(74,143,204,.16);color:#7fb3e0}
+.qhint{font-size:11px;color:rgba(212,168,67,.75);font-style:italic;margin-bottom:8px}
+.qimg-wrap{margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid rgba(245,234,214,.15);background:rgba(0,0,0,.2);min-height:60px}
+.qimg{display:block;width:100%;max-height:340px;object-fit:contain;background:rgba(0,0,0,.25)}
+.qimg-err{padding:18px;text-align:center;font-size:12px;color:rgba(245,234,214,.35);font-style:italic}
+.question{font-family:'Playfair Display',serif;font-size:clamp(15px,2vw,19px);line-height:1.56;margin-bottom:20px}
+.question em{font-style:normal;color:#d4a843;font-weight:700}
+.opts{display:grid;gap:8px}
+.opt{padding:11px 15px;border:1px solid rgba(245,234,214,.13);border-radius:8px;background:rgba(39,75,58,.25);color:rgba(245,234,214,.72);font-family:'Lora',serif;font-size:14px;text-align:left;cursor:pointer;display:flex;align-items:flex-start;gap:8px;width:100%}
+.opt-l{font-size:10px;color:rgba(245,234,214,.26);margin-top:2px;min-width:13px}
+.opt-cb{width:15px;height:15px;border-radius:4px;border:1px solid rgba(245,234,214,.35);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#1a3328}
+.opt.cbon .opt-cb{background:#d4a843;border-color:#d4a843}
+.opt:hover:not(:disabled){border-color:#c4622d;background:rgba(196,98,45,.09);color:#f5ead6}
+.opt.ok{border-color:#4a8c5c;background:rgba(74,140,92,.14);color:#96dca0}
+.opt.no{border-color:#b5312c;background:rgba(181,49,44,.12);color:#e0a8a8}
+.opt.miss{border-color:#d4a843;background:rgba(212,168,67,.1);color:#e8cf8a}
+.opt:disabled{cursor:default}
+.farea{width:100%;background:rgba(26,51,40,.6);border:1px solid rgba(245,234,214,.22);border-radius:8px;padding:12px 14px;color:#f5ead6;font-family:'Lora',serif;font-size:15px;outline:none;resize:vertical;min-height:105px;line-height:1.6}
+.farea:focus{border-color:#c4622d}
+.farea:disabled{opacity:.68}
+.brow{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.fb{margin-top:14px;padding:12px 15px;border-radius:7px;font-size:14px;line-height:1.65}
+.fb-ok{background:rgba(74,140,92,.14);border-left:3px solid #4a8c5c;color:#a0dca0}
+.fb-no{background:rgba(181,49,44,.12);border-left:3px solid #b5312c;color:#e0b0b0}
+.fb strong{display:block;font-size:9px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:4px;opacity:.72}
+.model-ans{margin-top:12px;padding:12px 15px;background:rgba(212,168,67,.15);border-left:3px solid #d4a843;border-radius:0 6px 6px 0}
+.model-ans strong{display:block;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#d4a843;margin-bottom:5px}
+.model-ans p{font-size:14px;line-height:1.7;color:rgba(245,234,214,.72)}
+.empty{text-align:center;padding:44px 18px;color:rgba(245,234,214,.3);font-style:italic;font-size:15px;line-height:1.7}
+.empty b{display:block;font-family:'Playfair Display',serif;font-style:normal;font-size:19px;color:rgba(245,234,214,.6);margin-bottom:8px}
+.sum{text-align:center}
+.sum-pct{font-family:'Playfair Display',serif;font-size:52px;color:#c4622d}
+@media(max-width:480px){.qcard{padding:18px 13px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================================
+   KOZAK TRAINING HUB — standalone (GitHub Pages)
+   Questions are read live from a published Google Sheet (CSV via gviz).
+   Sheet must be shared as "Anyone with the link -> Viewer".
+
+   CSV columns expected (header row, any case):
+   ID | Format | Topics | Positions | Location | Item | Question |
+   OptionA | OptionB | OptionC | OptionD | Correct | ModelAnswer | Image | Status
+
+   Format: CS (choose single) / CM (choose multiple) / CI (choose incorrect) / OA (open answer)
+   Topics: comma-separated, any of TOPIC_LIST below
+   Positions: comma-separated position codes, blank = applies to all positions
+   Correct: CS/CI -> single letter (A-D). CM -> comma-separated letters (A,C). OA -> blank.
+   Image: optional Google Drive share link or direct image URL.
+   Status: Published / Draft — only Published rows are served.
+   ========================================================================= */
+const SHEET_ID = "1SeqV6N7VU1OF08C5jpUD5gcWYGHxp4jw2iiyyYPRH0M";
+const GID = "1760260323";
+function csvUrl() {
+  return "https://docs.google.com/spreadsheets/d/e/2PACX-1vSD1W8fYEorDzVNpUftAGbzhrGcR24WFmNgim293JZEjWWc0CAgcspY2xNvzI9n9lDfkp-eDpWUqY69/pub?gid=1760260323&single=true&output=csv&cacheBust=" + Date.now();
+}
+   
+const LOCATIONS=[
+  {code:"GT",name:"Gastown / Cordova"},
+  {code:"NW",name:"New West",locked:true},
+  {code:"VD",name:"Victoria Drive",locked:true},
+  {code:"LG",name:"Langley",locked:true},
+  {code:"NT",name:"North Vancouver",locked:true},
+];
+const POSITIONS=[
+  {code:"server",name:"Server"},
+  {code:"bar",name:"Bar"},
+  {code:"lavka",name:"Lavka"},
+  {code:"welcome",name:"Welcome / Host"},
+  {code:"hot",name:"Hot Line"},
+  {code:"cold",name:"Cold Line"},
+  {code:"baker",name:"Baker"},
+  {code:"driver",name:"Driver"},
+  {code:"cook",name:"Cook"},
+  {code:"bread",name:"Bread"},
+];
+const TOPIC_LIST=[
+  "Explain a dish",
+  "Describe a dish",
+  "Guest Scenario",
+  "General menu questions",
+  "Wine List knowledge",
+  "Wine Service",
+  "What's the dish in the photo",
+  "Operations",
+  "Non alcoholic drinks",
+  "Cocktails and other spirits",
+];
+const FORMAT_LABEL={CS:"Choose One",CM:"Choose Multiple",CI:"Choose the Incorrect One",OA:"Open Answer"};
+const LETTERS=["A","B","C","D"];
+
+/* ---- state ---- */
+const S={
+  loc:null,pos:null,
+  bank:[],bankTotal:0,bankLoaded:false,bankLoading:false,bankError:"",
+  selTopics:TOPIC_LIST.slice(),
+  started:false,done:false,pool:[],idx:0,
+  sel:null,free:"",revealed:false,
+  cmSelected:new Set(),cmSubmitted:false,
+  score:{c:0,t:0},streak:0,
+};
+
+/* ---- helpers ---- */
+function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function allowEm(s){return esc(s).replace(/&lt;em&gt;/g,"<em>").replace(/&lt;\/em&gt;/g,"</em>");}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pct(c,t){return t>0?Math.round((c/t)*100):0;}
+function norm(s){return (s||"").trim();}
+function setEq(a,b){if(a.length!==b.length)return false;const sa=[...a].sort(),sb=[...b].sort();return sa.every((v,i)=>v===sb[i]);}
+
+// shuffle options while keeping track of which (possibly multiple) indices are correct
+function shuffleOpts(q){
+  if(!["CS","CM","CI"].includes(q.format)||!q.opts||!q.opts.length)return q;
+  const correctSet=new Set(q.ansIdx);
+  const paired=q.opts.map((o,i)=>({o,c:correctSet.has(i)}));
+  const s=shuffle(paired);
+  const opts=s.map(x=>x.o);
+  const ansIdx=s.map((x,i)=>x.c?i:-1).filter(i=>i!==-1);
+  return Object.assign({},q,{opts,ansIdx});
+}
+
+// convert a Google Drive share link to a direct, hotlinkable image URL.
+// passes through any other URL unchanged.
+function driveToDirectUrl(url){
+  if(!url)return "";
+  url=url.trim();
+  let m=url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(!m)m=url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(!m)return url;
+  return "https://drive.google.com/uc?export=view&id="+m[1];
+}
+
+/* ---- CSV parsing ---- */
+function parseCSV(text){
+  const rows=[];let row=[];let field="";let i=0;let inQ=false;
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i+=2;continue;} inQ=false;i++;continue; }
+      field+=c;i++;continue;
+    }
+    if(c==='"'){inQ=true;i++;continue;}
+    if(c===','){row.push(field);field="";i++;continue;}
+    if(c==='\r'){i++;continue;}
+    if(c==='\n'){row.push(field);rows.push(row);row=[];field="";i++;continue;}
+    field+=c;i++;
+  }
+  if(field.length>0||row.length>0){row.push(field);rows.push(row);}
+  return rows.filter(r=>r.length>1||(r.length===1&&r[0].trim()!==""));
+}
+
+/* ---- load + filter the sheet ---- */
+async function loadBank(){
+  S.bankLoading=true;S.bankError="";S.bankLoaded=false;render();
+  try{
+    const res=await fetch(csvUrl());
+    if(!res.ok) throw new Error("Sheet responded "+res.status+". Make sure it's shared as 'Anyone with the link'.");
+    const csv=await res.text();
+    if(!csv||csv.indexOf(",")===-1) throw new Error("Empty/invalid response from the Sheet.");
+    const rows=parseCSV(csv);
+    if(rows.length<2){S.bank=[];S.bankTotal=0;S.bankLoaded=true;S.bankLoading=false;render();return;}
+    const header=rows[0].map(h=>norm(h).toLowerCase());
+    const col=n=>header.indexOf(n);
+    const ci={id:col("id"),format:col("format"),topics:col("topics"),positions:col("positions"),loc:col("location"),item:col("item"),question:col("question"),a:col("optiona"),b:col("optionb"),cc:col("optionc"),dd:col("optiond"),correct:col("correct"),model:col("modelanswer"),image:col("image"),status:col("status")};
+    if(ci.format<0||ci.status<0) throw new Error("Sheet headers don't match. Found: "+header.join(", "));
+    let total=0;const out=[];
+    for(let n=1;n<rows.length;n++){
+      const rrow=rows[n];
+      const g=k=>ci[k]>=0?norm(rrow[ci[k]]):"";
+      if(!g("format"))continue;
+      total++;
+      if(g("status").toLowerCase()!=="published")continue;
+      const rowLoc=g("loc")||"All";
+      if(rowLoc!=="All"&&rowLoc!==S.loc)continue;
+      const posRaw=g("positions");
+      if(posRaw){
+        const list=posRaw.split(/[,;]/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+        if(list.length&&!list.includes(S.pos))continue;
+      }
+      const format=g("format").toUpperCase();
+      const topics=g("topics").split(/[,;]/).map(t=>t.trim()).filter(Boolean);
+      const q={id:g("id")||("row"+n),format,topics,cat:topics[0]||"",item:g("item"),q:g("question")||g("item")};
+      if(rowLoc!=="All")q.loc=rowLoc;
+      const img=driveToDirectUrl(g("image"));
+      if(img)q.image=img;
+      if(format==="CS"||format==="CI"){
+        q.opts=[g("a"),g("b"),g("cc"),g("dd")].filter(o=>o!=="");
+        const letter=g("correct").toUpperCase();
+        q.ansIdx=LETTERS.indexOf(letter)>=0?[LETTERS.indexOf(letter)]:[0];
+      }else if(format==="CM"){
+        q.opts=[g("a"),g("b"),g("cc"),g("dd")].filter(o=>o!=="");
+        q.ansIdx=g("correct").toUpperCase().split(/[,;]/).map(l=>LETTERS.indexOf(l.trim())).filter(i=>i>=0);
+      }else{ // OA
+        q.modelAnswer=g("model");
+      }
+      out.push(q);
+    }
+    S.bank=out;S.bankTotal=total;S.bankLoaded=true;
+  }catch(e){
+    S.bankError=(e&&e.message)?e.message:"Unknown error loading the question bank.";
+  }
+  S.bankLoading=false;render();
+}
+
+/* ---- quiz actions ---- */
+function beginQuiz(){
+  const topics=S.selTopics.length?S.selTopics:TOPIC_LIST;
+  const built=shuffle(S.bank.filter(q=>q.topics.some(t=>topics.includes(t)))).map(shuffleOpts);
+  S.pool=built;S.idx=0;resetQState();
+  S.score={c:0,t:0};S.streak=0;S.done=false;S.started=true;render();
+}
+function resetQState(){S.sel=null;S.free="";S.revealed=false;S.cmSelected=new Set();S.cmSubmitted=false;}
+
+function answerSingle(i){ // CS / CI
+  if(S.sel!==null)return;
+  S.sel=i;const cur=S.pool[S.idx];const ok=cur.ansIdx.includes(i);
+  S.score={c:S.score.c+(ok?1:0),t:S.score.t+1};S.streak=ok?S.streak+1:0;render();
+}
+function toggleCM(i){
+  if(S.cmSubmitted)return;
+  if(S.cmSelected.has(i))S.cmSelected.delete(i);else S.cmSelected.add(i);
+  render();
+}
+function submitCM(){
+  if(S.cmSubmitted)return;
+  S.cmSubmitted=true;
+  const cur=S.pool[S.idx];
+  const ok=setEq([...S.cmSelected],cur.ansIdx);
+  S.score={c:S.score.c+(ok?1:0),t:S.score.t+1};S.streak=ok?S.streak+1:0;
+  render();
+}
+function revealFree(){ S.revealed=true; render(); }
+function nextQ(){
+  if(S.idx+1>=S.pool.length){S.done=true;render();return;}
+  S.idx++;resetQState();render();
+}
+
+/* ---- rendering ---- */
+function el(html){const d=document.createElement("div");d.innerHTML=html.trim();return d.firstChild;}
+
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  if(!S.loc||!S.pos){app.appendChild(renderPicker());return;}
+  app.appendChild(renderHeader());
+  const page=document.createElement("div");page.className="page";
+  page.appendChild(renderStatus());
+  if(!S.started)page.appendChild(renderSetup());
+  else if(!S.done&&S.pool[S.idx])page.appendChild(renderQuestion());
+  else if(S.done)page.appendChild(renderSummary());
+  app.appendChild(page);
+}
+
+function renderPicker(){
+  const w=el('<div class="picker-wrap"></div>');
+  w.appendChild(el('<div class="hdr" style="border:none;background:none;box-shadow:none"><div class="hdr-in" style="justify-content:center"><div class="hdr-l"><div class="hdr-logo">\u041A</div><div><div class="hdr-name">\u041A\u043E\u0437\u0430\u043A \u00B7 Kozak</div><div class="hdr-sub">Training Hub</div></div></div></div></div>'));
+  w.appendChild(el('<div class="picker-title">Where are you working today?</div>'));
+  w.appendChild(el('<div class="picker-sub">Currently rolling out Gastown / Cordova first \u2014 other locations unlock soon.</div>'));
+  w.appendChild(el('<div class="slbl">Location</div>'));
+  const lg=el('<div class="pick-grid"></div>');
+  LOCATIONS.forEach(l=>{
+    const c=el('<div class="pick-card'+(S.loc===l.code?' on':'')+(l.locked?' lk':'')+'">'+(l.locked?'<div class="pick-card-lock">\uD83D\uDD12</div>':'')+'<div class="pick-card-code">'+l.code+'</div><div class="pick-card-name">'+l.name+'</div></div>');
+    if(!l.locked)c.onclick=()=>{S.loc=l.code;render();};
+    lg.appendChild(c);
+  });
+  w.appendChild(lg);
+  w.appendChild(el('<div class="slbl">Position</div>'));
+  const pg=el('<div class="pick-grid"></div>');
+  POSITIONS.forEach(p=>{
+    const c=el('<div class="pick-card'+(S.pos===p.code?' on':'')+'"><div class="pick-card-name">'+p.name+'</div></div>');
+    c.onclick=()=>{S.pos=p.code;render();};
+    pg.appendChild(c);
+  });
+  w.appendChild(pg);
+  if(S.loc&&S.pos){
+    const cta=el('<div class="pick-cta"></div>');
+    const b=el('<button class="b-pri" style="font-size:15px">Enter Training Hub \u2192</button>');
+    b.onclick=()=>{loadBank();};
+    cta.appendChild(b);w.appendChild(cta);
+  }
+  return w;
+}
+
+function renderHeader(){
+  const loc=LOCATIONS.find(l=>l.code===S.loc),pos=POSITIONS.find(p=>p.code===S.pos);
+  const h=el('<div class="hdr"><div class="hdr-in"><div class="hdr-l"><div class="hdr-logo">\u041A</div><div><div class="hdr-name">\u041A\u043E\u0437\u0430\u043A \u00B7 Kozak</div><div class="hdr-sub">'+loc.name+' \u00B7 '+pos.name+'</div></div></div><button class="hdr-btn">\u21BA Change location/position</button></div></div>');
+  h.querySelector(".hdr-btn").onclick=()=>{S.loc=null;S.pos=null;S.started=false;S.bank=[];S.bankLoaded=false;render();};
+  return h;
+}
+
+function renderStatus(){
+  const loc=LOCATIONS.find(l=>l.code===S.loc),pos=POSITIONS.find(p=>p.code===S.pos);
+  let cls="stale",msg="Not loaded yet.";
+  if(S.bankLoading){cls="stale";msg="Loading questions for <b>"+loc.name+" \u00B7 "+pos.name+"</b>\u2026";}
+  else if(S.bankError){cls="err";msg="\u26A0 "+esc(S.bankError);}
+  else if(S.bankLoaded){cls="fresh";msg="\u2713 <b>"+S.bank.length+"</b> question"+(S.bank.length===1?"":"s")+" for "+loc.name+" \u00B7 "+pos.name+" (of "+S.bankTotal+" total in the Sheet).";}
+  const bar=el('<div class="status-bar '+cls+'"><span>'+msg+'</span><button class="status-btn">\u27F3 Refresh from Sheet</button></div>');
+  const btn=bar.querySelector(".status-btn");
+  if(S.bankLoading)btn.disabled=true;
+  btn.onclick=()=>loadBank();
+  return bar;
+}
+
+function renderSetup(){
+  const wrap=document.createElement("div");
+  wrap.appendChild(el('<div class="slbl">Topics</div>'));
+  const tg=el('<div class="chips"></div>');
+  const allOn=S.selTopics.length===TOPIC_LIST.length;
+  const allChip=el('<div class="chip'+(allOn?' on':'')+'"><span class="chip-box">'+(allOn?'\u2713':'')+'</span>All Topics</div>');
+  allChip.onclick=()=>{S.selTopics=allOn?[]:TOPIC_LIST.slice();render();};
+  tg.appendChild(allChip);
+  TOPIC_LIST.forEach(t=>{
+    const on=S.selTopics.includes(t);
+    const c=el('<div class="chip'+(on?' on':'')+'"><span class="chip-box">'+(on?'\u2713':'')+'</span>'+esc(t)+'</div>');
+    c.onclick=()=>{S.selTopics=on?S.selTopics.filter(x=>x!==t):S.selTopics.concat([t]);render();};
+    tg.appendChild(c);
+  });
+  wrap.appendChild(tg);
+  const row=el('<div class="start-row"></div>');
+  const start=el('<button class="b-pri">Start Quiz \u2192</button>');
+  if(S.selTopics.length===0||S.bankLoading||S.bank.length===0)start.disabled=true;
+  start.onclick=beginQuiz;
+  row.appendChild(start);
+  wrap.appendChild(row);
+  if(!S.bankLoading&&S.bankLoaded&&S.bank.length===0&&!S.bankError){
+    const loc=LOCATIONS.find(l=>l.code===S.loc),pos=POSITIONS.find(p=>p.code===S.pos);
+    wrap.appendChild(el('<div class="empty" style="padding:24px 12px"><b>No questions yet</b>Nothing published in the Sheet for '+loc.name+' \u00B7 '+pos.name+'. A manager can add rows (Status = Published) to the questions tab, then hit Refresh.</div>'));
+  }
+  return wrap;
+}
+
+function renderQuestion(){
+  const cur=S.pool[S.idx];
+  const wrap=document.createElement("div");
+  const hd=el('<div class="qhdr"><div><span class="qstat-pill">Score: <strong>'+S.score.c+'/'+S.score.t+'</strong></span>'+(S.score.t>0?'<span class="qstat-pill">'+pct(S.score.c,S.score.t)+'%</span>':'')+(S.streak>=3?'<span class="qstat-pill streak">\uD83D\uDD25 '+S.streak+'</span>':'')+'</div><span class="qstat-pill">'+(S.idx+1)+'/'+S.pool.length+'</span></div>');
+  wrap.appendChild(hd);
+  wrap.appendChild(el('<div class="pbar-row"><div class="pbar-track"><div class="pbar-fill" style="width:'+pct(S.idx,S.pool.length)+'%"></div></div><div class="pbar-lbl">'+pct(S.idx,S.pool.length)+'%</div></div>'));
+  const card=document.createElement("div");card.className="qcard";
+  let meta='<div class="qmeta"><span class="qcat">'+esc(cur.topics[0]||"")+'</span><span class="qtype">'+esc(FORMAT_LABEL[cur.format]||cur.format)+'</span>';
+  if(cur.item)meta+='<span class="qtype dim">\u00B7 '+esc(cur.item)+'</span>';
+  if(cur.loc)meta+='<span class="qloc">'+esc(cur.loc)+' only</span>';
+  meta+='</div>';
+  card.appendChild(el(meta));
+
+  if(cur.format==="CM")card.appendChild(el('<div class="qhint">Select ALL that apply, then Submit.</div>'));
+  if(cur.format==="CI")card.appendChild(el('<div class="qhint">Pick the ONE statement that is incorrect.</div>'));
+
+  if(cur.image){
+    const iw=el('<div class="qimg-wrap"></div>');
+    const img=document.createElement("img");
+    img.className="qimg";img.src=cur.image;img.alt="";
+    img.onerror=()=>{iw.innerHTML='<div class="qimg-err">Image could not load - check the Drive link is shared as Anyone with the link.</div>';};
+    iw.appendChild(img);
+    card.appendChild(iw);
+  }
+
+  card.appendChild(el('<div class="question">'+allowEm(cur.q)+'</div>'));
+
+  if(cur.format==="CS"||cur.format==="CI"){
+    const opts=el('<div class="opts"></div>');
+    cur.opts.forEach((o,i)=>{
+      let cls="opt";
+      if(S.sel!==null){ if(cur.ansIdx.includes(i))cls+=" ok"; else if(i===S.sel)cls+=" no"; }
+      const b=el('<button class="'+cls+'"><span class="opt-l">'+LETTERS[i]+'</span><span>'+esc(o)+'</span></button>');
+      if(S.sel!==null)b.disabled=true; else b.onclick=()=>answerSingle(i);
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    if(S.sel!==null){
+      const ok=cur.ansIdx.includes(S.sel);
+      const correctText=cur.ansIdx.map(i=>LETTERS[i]+": "+cur.opts[i]).join("; ");
+      card.appendChild(el('<div class="fb '+(ok?'fb-ok':'fb-no')+'"><strong>'+(ok?'\u2713 Correct':'\u2717 Not quite')+'</strong>'+(ok?'Nice work.':'The correct answer is '+esc(correctText))+'</div>'));
+      const nb=el('<button class="b-nxt">Next \u2192</button>');nb.onclick=nextQ;card.appendChild(nb);
+    }else{
+      const br=el('<div class="brow"></div>');const sk=el('<button class="b-skip">Skip</button>');sk.onclick=nextQ;br.appendChild(sk);card.appendChild(br);
+    }
+  }else if(cur.format==="CM"){
+    const opts=el('<div class="opts"></div>');
+    cur.opts.forEach((o,i)=>{
+      let cls="opt";
+      const sel=S.cmSelected.has(i);
+      if(S.cmSubmitted){
+        if(cur.ansIdx.includes(i)&&sel)cls+=" ok";
+        else if(!cur.ansIdx.includes(i)&&sel)cls+=" no";
+        else if(cur.ansIdx.includes(i)&&!sel)cls+=" miss";
+      }else if(sel)cls+=" cbon";
+      const b=el('<button class="'+cls+'"><span class="opt-cb">'+(sel?'\u2713':'')+'</span><span class="opt-l">'+LETTERS[i]+'</span><span>'+esc(o)+'</span></button>');
+      if(S.cmSubmitted)b.disabled=true; else b.onclick=()=>toggleCM(i);
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    if(!S.cmSubmitted){
+      const br=el('<div class="brow"></div>');
+      const sub=el('<button class="b-pri">Submit</button>');
+      if(S.cmSelected.size===0)sub.disabled=true;
+      sub.onclick=submitCM;
+      const sk=el('<button class="b-skip">Skip</button>');sk.onclick=nextQ;
+      br.appendChild(sub);br.appendChild(sk);card.appendChild(br);
+    }else{
+      const ok=setEq([...S.cmSelected],cur.ansIdx);
+      const correctText=cur.ansIdx.map(i=>LETTERS[i]).join(", ");
+      card.appendChild(el('<div class="fb '+(ok?'fb-ok':'fb-no')+'"><strong>'+(ok?'\u2713 Correct':'\u2717 Not quite')+'</strong>'+(ok?'You got all of them.':'The correct selection was '+esc(correctText)+'.')+'</div>'));
+      const nb=el('<button class="b-nxt">Next \u2192</button>');nb.onclick=nextQ;card.appendChild(nb);
+    }
+  }else{ // OA
+    const ta=el('<textarea class="farea" rows="5" placeholder="Write your answer \u2014 be as thorough as you would be on the floor\u2026"></textarea>');
+    ta.value=S.free;
+    if(S.revealed)ta.disabled=true;
+    ta.oninput=e=>{S.free=e.target.value;};
+    card.appendChild(ta);
+    if(!S.revealed){
+      const br=el('<div class="brow"></div>');
+      const show=el('<button class="b-pri">Show Model Answer</button>');
+      show.onclick=revealFree;
+      const sk=el('<button class="b-skip">Skip</button>');sk.onclick=nextQ;
+      br.appendChild(show);br.appendChild(sk);card.appendChild(br);
+    }else{
+      card.appendChild(el('<div class="model-ans"><strong>Model Answer</strong><p>'+esc(cur.modelAnswer||"")+'</p></div>'));
+      const nb=el('<button class="b-nxt">Next \u2192</button>');nb.onclick=nextQ;card.appendChild(nb);
+    }
+  }
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderSummary(){
+  const wrap=document.createElement("div");
+  const card=el('<div class="qcard sum"><div style="font-size:42px;margin-bottom:8px">\uD83C\uDF3B</div><div style="font-family:\'Playfair Display\',serif;font-size:26px;margin-bottom:6px">Round Complete</div><div style="font-size:13px;color:rgba(245,234,214,.5);margin-bottom:18px">'+S.score.t+' questions this round</div><div class="sum-pct">'+pct(S.score.c,S.score.t)+'%</div><div style="font-size:12px;color:rgba(245,234,214,.4);margin-bottom:22px">'+S.score.c+' correct out of '+S.score.t+'</div></div>');
+  const br=el('<div class="brow" style="justify-content:center"></div>');
+  const nr=el('<button class="b-pri">New Round</button>');nr.onclick=beginQuiz;
+  const cf=el('<button class="b-gho">Change Topics</button>');cf.onclick=()=>{S.started=false;render();};
+  br.appendChild(nr);br.appendChild(cf);card.appendChild(br);
+  wrap.appendChild(card);
+  return wrap;
+}
+
+render();
+</script>
+</body>
+</html>
