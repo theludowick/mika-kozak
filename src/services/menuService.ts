@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchCSV } from './csvService';
+import { fetchMenuPhotos } from './photoService';
 import { ENV } from '../lib/env';
 import { QUERY_KEYS } from '../constants/queryKeys';
 import { MenuRowSchema } from '../types/menu';
@@ -68,12 +69,20 @@ function parseMenuRow(raw: Record<string, string>, rowIndex: number): MenuItem |
 }
 
 async function fetchMenuItems(): Promise<MenuItem[]> {
-  const { data } = await fetchCSV(ENV.MENU_CSV_URL);
+  const [{ data }, photos] = await Promise.all([
+    fetchCSV(ENV.MENU_CSV_URL),
+    fetchMenuPhotos(),
+  ]);
   const items: MenuItem[] = [];
 
   data.forEach((row, i) => {
     const item = parseMenuRow(row, i + 1);
-    if (item) items.push(item);
+    if (!item) return;
+    items.push(
+      item.csvId && photos[item.csvId]
+        ? { ...item, imageUrl: photos[item.csvId] ?? null }
+        : item,
+    );
   });
 
   return items;

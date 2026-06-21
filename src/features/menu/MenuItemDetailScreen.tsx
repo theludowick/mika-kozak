@@ -1,9 +1,15 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
 import type { MenuItem, LocationCode } from '../../types/menu';
 import { EATERY_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
+import { resizeImageUrl } from '../../utils/imageUtils';
+import { uploadMenuPhoto } from '../../services/photoService';
+import { useAuth } from '../auth/AuthContext';
+import { QUERY_KEYS } from '../../constants/queryKeys';
 import { C, FONT } from '../../constants/theme';
 
 interface MenuItemDetailScreenProps {
@@ -33,6 +39,23 @@ function getSections(item: MenuItem, location: LocationCode | 'ALL'): Section[] 
 
 export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuItemDetailScreenProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const [localImageUrl, setLocalImageUrl] = useState<string | null>(null);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (uploading) {
+      progressAnim.setValue(0);
+      Animated.timing(progressAnim, { toValue: 0.85, duration: 10000, useNativeDriver: false }).start();
+    } else {
+      Animated.timing(progressAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start(() => {
+        setTimeout(() => progressAnim.setValue(0), 400);
+      });
+    }
+  }, [uploading]);
+
   const sections = getSections(item, selectedLocation);
   const locationLabel =
     selectedLocation !== 'ALL' ? LOCATION_NAMES[selectedLocation as LocationCode] : 'All locations';
@@ -41,12 +64,85 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
     .map((csvId) => allItems.find((i) => i.csvId === csvId))
     .filter((i): i is MenuItem => i !== undefined);
 
+  const displayImageUrl = localImageUrl ?? resizeImageUrl(item.imageUrl, 'w600') ?? item.imageUrl;
+
+  const handlePickImage = async (source: 'camera' | 'library') => {
+    if (!item.csvId) {
+      Alert.alert('Error', 'This item has no ID — add one in the spreadsheet first.');
+      return;
+    }
+
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const pickedUri = result.assets[0].uri;
+    const previousUrl = localImageUrl;
+    setLocalImageUrl(pickedUri);
+    setUploading(true);
+    try {
+      const url = await uploadMenuPhoto(item.csvId, pickedUri);
+      setLocalImageUrl(url);
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
+    } catch (e) {
+      setLocalImageUrl(previousUrl);
+      Alert.alert('Upload failed', (e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const promptImageSource = () => {
+    if (Platform.OS === 'web') return;
+    Alert.alert('Upload Photo', 'Choose a source', [
+      { text: 'Take Photo', onPress: () => void handlePickImage('camera') },
+      { text: 'Choose from Library', onPress: () => void handlePickImage('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       {/* Image */}
-      {item.imageUrl && (
-        <View style={styles.imageWrap}>
-          <ImageWithFallback uri={item.imageUrl} aspectRatio={4 / 3} contentFit="cover" />
+      <View style={styles.imageWrap}>
+        {displayImageUrl ? (
+          <ImageWithFallback uri={displayImageUrl} aspectRatio={4 / 3} contentFit="cover" />
+        ) : (
+          <View style={styles.imagePlaceholder} />
+        )}
+        {uploading && <View style={styles.uploadOverlay} />}
+      </View>
+
+      {/* Upload progress bar */}
+      {uploading && (
+        <View style={styles.progressTrack}>
+          <Animated.View
+            style={[styles.progressFill, {
+              width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            }]}
+          />
+        </View>
+      )}
+
+      {/* Admin photo buttons */}
+      {isAdmin && (
+        <View style={styles.adminRow}>
+          {Platform.OS === 'web' ? (
+            <>
+              <TouchableOpacity style={styles.adminBtn} onPress={() => void handlePickImage('camera')}>
+                <Text style={styles.adminBtnText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.adminBtn} onPress={() => void handlePickImage('library')}>
+                <Text style={styles.adminBtnText}>Library</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={styles.adminBtn} onPress={promptImageSource}>
+              <Text style={styles.adminBtnText}>{item.imageUrl ? 'Replace Photo' : 'Add Photo'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -114,7 +210,39 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 48, maxWidth: 820, width: '100%', alignSelf: 'center' },
 
-  imageWrap: { width: '70%', alignSelf: 'center', marginBottom: 24, borderRadius: 16, overflow: 'hidden' },
+  imageWrap: { width: '70%', alignSelf: 'center', marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
+  imagePlaceholder: { width: '100%', aspectRatio: 4 / 3, backgroundColor: C.surfaceHigh },
+  uploadOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: C.border,
+    borderRadius: 2,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: C.primary,
+    borderRadius: 2,
+  },
+  adminRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  adminBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.borderBright,
+    backgroundColor: C.surface,
+  },
+  adminBtnText: { fontSize: 12, color: C.textSub, fontFamily: FONT.medium },
 
   header:      { marginBottom: 24 },
   name:        { fontSize: 26, fontFamily: FONT.extraBold, color: C.text, marginBottom: 10, lineHeight: 33 },

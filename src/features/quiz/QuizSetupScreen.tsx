@@ -30,14 +30,14 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
   const queryClient = useQueryClient();
   const { data: questions, isLoading, isError, error, refetch, dataUpdatedAt } = useQuizQuestions();
 
-  const [selectedLocation, setSelectedLocation] = useState<LocationCode | 'ALL' | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<LocationCode | null>(null);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([...TOPIC_LIST]);
   const [randomize, setRandomize] = useState(true);
 
   const locationQuestions = useMemo(() => {
     if (!questions) return [];
-    if (!selectedLocation || selectedLocation === 'ALL') return questions;
+    if (!selectedLocation) return questions;
     return questions.filter(
       (q) => q.locations.length === 0 || q.locations.includes(selectedLocation),
     );
@@ -63,7 +63,7 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
     }).length;
   }, [locationQuestions, selectedTopics, selectedPositions]);
 
-  const handleSelectLocation = (loc: LocationCode | 'ALL') => {
+  const handleSelectLocation = (loc: LocationCode) => {
     setSelectedLocation(loc);
     setSelectedPositions([]);
   };
@@ -73,7 +73,7 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
     const filters: QuizFilters = {
       topics: selectedTopics,
       positions: selectedPositions,
-      locations: selectedLocation === 'ALL' ? [] : [selectedLocation],
+      locations: [selectedLocation],
       item: '',
       randomizeOrder: randomize,
     };
@@ -130,11 +130,6 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
       {/* Location */}
       <Text style={styles.sectionLabel}>Location</Text>
       <View style={styles.chips}>
-        <FilterChip
-          label="All"
-          selected={selectedLocation === 'ALL'}
-          onPress={() => handleSelectLocation('ALL')}
-        />
         {ALL_LOCATIONS.map((loc) => (
           <FilterChip
             key={loc}
@@ -183,53 +178,57 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
             <Text style={styles.noneNote}>No position-specific questions for this location.</Text>
           )}
 
-          {/* Topics */}
-          <Text style={styles.sectionLabel}>
-            Topics{'  '}
-            <Text style={styles.optionalTag}>optional</Text>
-          </Text>
-          <View style={styles.chips}>
-            <FilterChip label="All Topics" selected={allTopicsOn} onPress={toggleAllTopics} />
-            {TOPIC_LIST.map((t) => (
-              <FilterChip
-                key={t}
-                label={t}
-                selected={selectedTopics.includes(t)}
-                onPress={() =>
-                  setSelectedTopics((prev) =>
-                    prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
-                  )
-                }
+          {selectedPositions.length > 0 && (
+            <>
+              {/* Topics */}
+              <Text style={styles.sectionLabel}>
+                Topics{'  '}
+                <Text style={styles.optionalTag}>optional</Text>
+              </Text>
+              <View style={styles.chips}>
+                <FilterChip label="All Topics" selected={allTopicsOn} onPress={toggleAllTopics} />
+                {TOPIC_LIST.map((t) => (
+                  <FilterChip
+                    key={t}
+                    label={t}
+                    selected={selectedTopics.includes(t)}
+                    onPress={() =>
+                      setSelectedTopics((prev) =>
+                        prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+                      )
+                    }
+                  />
+                ))}
+              </View>
+
+              {/* Randomize */}
+              <View style={styles.toggleRow}>
+                <View>
+                  <Text style={styles.toggleLabel}>Randomize order</Text>
+                  <Text style={styles.toggleSub}>Shuffle questions every session</Text>
+                </View>
+                <Switch
+                  value={randomize}
+                  onValueChange={setRandomize}
+                  trackColor={{ false: C.border, true: C.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+
+              {/* Start */}
+              <Button
+                label={`Start  ·  ${filteredCount} questions`}
+                onPress={handleStart}
+                disabled={!canStart}
+                style={styles.startBtn}
               />
-            ))}
-          </View>
 
-          {/* Randomize */}
-          <View style={styles.toggleRow}>
-            <View>
-              <Text style={styles.toggleLabel}>Randomize order</Text>
-              <Text style={styles.toggleSub}>Shuffle questions every session</Text>
-            </View>
-            <Switch
-              value={randomize}
-              onValueChange={setRandomize}
-              trackColor={{ false: C.border, true: C.primary }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          {/* Start */}
-          <Button
-            label={`Start  ·  ${filteredCount} questions`}
-            onPress={handleStart}
-            disabled={!canStart}
-            style={styles.startBtn}
-          />
-
-          {filteredCount === 0 && (
-            <Text style={styles.noMatch}>
-              No questions match your filters. Try selecting more topics.
-            </Text>
+              {filteredCount === 0 && (
+                <Text style={styles.noMatch}>
+                  No questions match your filters. Try selecting more topics.
+                </Text>
+              )}
+            </>
           )}
         </>
       )}

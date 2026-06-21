@@ -33,6 +33,13 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Kozak Training Hub to access your photos to upload menu item images.",
+          "cameraPermission": "Allow Kozak Training Hub to use your camera to take menu item photos."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#1a3328",

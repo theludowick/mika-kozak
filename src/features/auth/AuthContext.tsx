@@ -9,6 +9,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
+  isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<AuthError | null>;
   signOut: () => Promise<void>;
 }
@@ -53,8 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const isAdmin = state.user?.app_metadata?.role === 'admin';
+
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signOut }}>
+    <AuthContext.Provider value={{ ...state, isAdmin, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
