@@ -15,4 +15,4 @@ EXPO_PUBLIC_QUIZ_CSV_URL=${EXPO_PUBLIC_QUIZ_CSV_URL}
 EXPO_PUBLIC_MENU_CSV_URL=${EXPO_PUBLIC_MENU_CSV_URL}
 EOF
 
-npx expo export -p web
+npx expo export -p web --clear
