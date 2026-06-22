@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useMenuItems } from '../../src/services/menuService';
-import { useSelectedLocation } from '../../src/hooks/useSelectedLocation';
+import { useLocation } from '../../src/contexts/LocationContext';
 import { MenuItemDetailScreen } from '../../src/features/menu/MenuItemDetailScreen';
 import { LoadingState } from '../../src/components/ui/LoadingState';
 import { ErrorState } from '../../src/components/ui/ErrorState';
@@ -11,7 +11,7 @@ import { C, FONT } from '../../src/constants/theme';
 export default function MenuItemPage() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const { data: items, isLoading, isError, error, refetch } = useMenuItems();
-  const { location } = useSelectedLocation();
+  const { location } = useLocation();
 
   if (isLoading) return <LoadingState message="Loading…" />;
   if (isError)

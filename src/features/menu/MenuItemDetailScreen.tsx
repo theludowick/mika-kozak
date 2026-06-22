@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import type { MenuItem, LocationCode } from '../../types/menu';
-import { EATERY_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
+import { EATERY_LOCATIONS, ALL_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { resizeImageUrl } from '../../utils/imageUtils';
 import { uploadMenuPhoto } from '../../services/photoService';
@@ -14,7 +14,7 @@ import { C, FONT } from '../../constants/theme';
 
 interface MenuItemDetailScreenProps {
   item: MenuItem;
-  selectedLocation: LocationCode | 'ALL';
+  selectedLocation: LocationCode;
   allItems: MenuItem[];
 }
 
@@ -23,9 +23,8 @@ interface Section {
   value: string;
 }
 
-function getSections(item: MenuItem, location: LocationCode | 'ALL'): Section[] {
-  const locCode = location === 'ALL' ? null : location;
-  const useEatery = locCode === null || EATERY_LOCATIONS.includes(locCode as 'VD' | 'NW');
+function getSections(item: MenuItem, location: LocationCode): Section[] {
+  const useEatery = EATERY_LOCATIONS.includes(location as 'VD' | 'NW');
   const fields = useEatery ? item.eatery : item.restaurant;
 
   return [
@@ -57,8 +56,6 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
   }, [uploading]);
 
   const sections = getSections(item, selectedLocation);
-  const locationLabel =
-    selectedLocation !== 'ALL' ? LOCATION_NAMES[selectedLocation as LocationCode] : 'All locations';
 
   const relatedItems = item.relatedIds
     .map((csvId) => allItems.find((i) => i.csvId === csvId))
@@ -66,25 +63,26 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
 
   const displayImageUrl = localImageUrl ?? resizeImageUrl(item.imageUrl, 'w600') ?? item.imageUrl;
 
-  const handlePickImage = async (source: 'camera' | 'library') => {
-    if (!item.csvId) {
-      Alert.alert('Error', 'This item has no ID — add one in the spreadsheet first.');
-      return;
-    }
+  const promptLocationThenUpload = (imageUri: string) => {
+    Alert.alert(
+      'Assign Location',
+      'Which location is this photo for?',
+      [
+        ...ALL_LOCATIONS.map((loc) => ({
+          text: `${loc} — ${LOCATION_NAMES[loc]}`,
+          onPress: () => void doUpload(imageUri, [loc]),
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  };
 
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
-
-    if (result.canceled || !result.assets[0]) return;
-
-    const pickedUri = result.assets[0].uri;
+  const doUpload = async (imageUri: string, locations: LocationCode[]) => {
     const previousUrl = localImageUrl;
-    setLocalImageUrl(pickedUri);
+    setLocalImageUrl(imageUri);
     setUploading(true);
     try {
-      const url = await uploadMenuPhoto(item.csvId, pickedUri);
-      setLocalImageUrl(url);
+      await uploadMenuPhoto(item.id, imageUri, locations);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
     } catch (e) {
       setLocalImageUrl(previousUrl);
@@ -92,6 +90,15 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
     } finally {
       setUploading(false);
     }
+  };
+
+  const handlePickImage = async (source: 'camera' | 'library') => {
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+
+    if (result.canceled || !result.assets[0]) return;
+    promptLocationThenUpload(result.assets[0].uri);
   };
 
   const promptImageSource = () => {
@@ -140,7 +147,9 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
             </>
           ) : (
             <TouchableOpacity style={styles.adminBtn} onPress={promptImageSource}>
-              <Text style={styles.adminBtnText}>{item.imageUrl ? 'Replace Photo' : 'Add Photo'}</Text>
+              <Text style={styles.adminBtnText}>
+                {item.photos.length > 0 ? 'Add Another Photo' : 'Add Photo'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -153,7 +162,7 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
           {item.category ? <Text style={styles.tagCategory}>{item.category}</Text> : null}
           {item.subCategory ? <Text style={styles.tagSub}>{item.subCategory}</Text> : null}
         </View>
-        <Text style={styles.locationLabel}>{locationLabel}</Text>
+        <Text style={styles.locationLabel}>{LOCATION_NAMES[selectedLocation]}</Text>
       </View>
 
       {/* Content sections */}

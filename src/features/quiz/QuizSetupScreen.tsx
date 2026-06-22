@@ -12,9 +12,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useQuizQuestions } from '../../services/quizService';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TOPIC_LIST } from '../../constants/topics';
+import { useLocation } from '../../contexts/LocationContext';
 import type { ParsedQuestion, QuizFilters } from '../../types/quiz';
-import type { LocationCode } from '../../types/menu';
-import { ALL_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
 import { POSITIONS } from '../../types/profile';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -28,20 +27,19 @@ interface QuizSetupScreenProps {
 
 export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
   const queryClient = useQueryClient();
+  const { location } = useLocation();
   const { data: questions, isLoading, isError, error, refetch, dataUpdatedAt } = useQuizQuestions();
 
-  const [selectedLocation, setSelectedLocation] = useState<LocationCode | null>(null);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([...TOPIC_LIST]);
   const [randomize, setRandomize] = useState(true);
 
   const locationQuestions = useMemo(() => {
     if (!questions) return [];
-    if (!selectedLocation) return questions;
     return questions.filter(
-      (q) => q.locations.length === 0 || q.locations.includes(selectedLocation),
+      (q) => q.locations.length === 0 || q.locations.includes(location),
     );
-  }, [questions, selectedLocation]);
+  }, [questions, location]);
 
   const availablePositions = useMemo(() => {
     const codes = new Set<string>();
@@ -63,17 +61,12 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
     }).length;
   }, [locationQuestions, selectedTopics, selectedPositions]);
 
-  const handleSelectLocation = (loc: LocationCode) => {
-    setSelectedLocation(loc);
-    setSelectedPositions([]);
-  };
-
   const handleStart = () => {
-    if (!questions || selectedLocation === null) return;
+    if (!questions) return;
     const filters: QuizFilters = {
       topics: selectedTopics,
       positions: selectedPositions,
-      locations: [selectedLocation],
+      locations: [location],
       item: '',
       randomizeOrder: randomize,
     };
@@ -91,7 +84,6 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
     return <ErrorState message={(error as Error).message} onRetry={() => void refetch()} />;
 
   const allTopicsOn = selectedTopics.length === TOPIC_LIST.length;
-  const locationSelected = selectedLocation !== null;
   const positionRequired = availablePositions.length > 0 && selectedPositions.length === 0;
   const canStart = filteredCount > 0 && !positionRequired;
 
@@ -115,7 +107,7 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Ready to level up?</Text>
         <Text style={styles.heroSub}>
-          <Text style={styles.heroBold}>{questions?.length ?? 0}</Text> questions available
+          <Text style={styles.heroBold}>{locationQuestions.length}</Text> questions for your location
         </Text>
         <View style={styles.heroBottom}>
           <TouchableOpacity onPress={() => void refetch()} style={styles.refreshPill}>
@@ -127,108 +119,85 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
         </View>
       </View>
 
-      {/* Location */}
-      <Text style={styles.sectionLabel}>Location</Text>
-      <View style={styles.chips}>
-        {ALL_LOCATIONS.map((loc) => (
-          <FilterChip
-            key={loc}
-            label={LOCATION_NAMES[loc]}
-            selected={selectedLocation === loc}
-            onPress={() => handleSelectLocation(loc)}
-          />
-        ))}
-      </View>
-
-      {!locationSelected && (
-        <View style={styles.hintBox}>
-          <Text style={styles.hintText}>↑  Choose a location to unlock your quiz</Text>
-        </View>
+      {/* Position — required */}
+      <Text style={styles.sectionLabel}>Position</Text>
+      {availablePositions.length > 0 ? (
+        <>
+          <View style={styles.chips}>
+            {availablePositions.map((p) => (
+              <FilterChip
+                key={p.code}
+                label={p.name}
+                selected={selectedPositions.includes(p.code)}
+                onPress={() =>
+                  setSelectedPositions((prev) =>
+                    prev.includes(p.code)
+                      ? prev.filter((x) => x !== p.code)
+                      : [...prev, p.code],
+                  )
+                }
+              />
+            ))}
+          </View>
+          {positionRequired && (
+            <View style={styles.hintBox}>
+              <Text style={styles.hintText}>↑  Select your position to continue</Text>
+            </View>
+          )}
+        </>
+      ) : (
+        <Text style={styles.noneNote}>No position-specific questions for this location.</Text>
       )}
 
-      {locationSelected && (
+      {selectedPositions.length > 0 && (
         <>
-          {/* Position — required */}
-          <Text style={styles.sectionLabel}>Position</Text>
-          {availablePositions.length > 0 ? (
-            <>
-              <View style={styles.chips}>
-                {availablePositions.map((p) => (
-                  <FilterChip
-                    key={p.code}
-                    label={p.name}
-                    selected={selectedPositions.includes(p.code)}
-                    onPress={() =>
-                      setSelectedPositions((prev) =>
-                        prev.includes(p.code)
-                          ? prev.filter((x) => x !== p.code)
-                          : [...prev, p.code],
-                      )
-                    }
-                  />
-                ))}
-              </View>
-              {positionRequired && (
-                <View style={styles.hintBox}>
-                  <Text style={styles.hintText}>↑  Select your position to continue</Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <Text style={styles.noneNote}>No position-specific questions for this location.</Text>
-          )}
-
-          {selectedPositions.length > 0 && (
-            <>
-              {/* Topics */}
-              <Text style={styles.sectionLabel}>
-                Topics{'  '}
-                <Text style={styles.optionalTag}>optional</Text>
-              </Text>
-              <View style={styles.chips}>
-                <FilterChip label="All Topics" selected={allTopicsOn} onPress={toggleAllTopics} />
-                {TOPIC_LIST.map((t) => (
-                  <FilterChip
-                    key={t}
-                    label={t}
-                    selected={selectedTopics.includes(t)}
-                    onPress={() =>
-                      setSelectedTopics((prev) =>
-                        prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
-                      )
-                    }
-                  />
-                ))}
-              </View>
-
-              {/* Randomize */}
-              <View style={styles.toggleRow}>
-                <View>
-                  <Text style={styles.toggleLabel}>Randomize order</Text>
-                  <Text style={styles.toggleSub}>Shuffle questions every session</Text>
-                </View>
-                <Switch
-                  value={randomize}
-                  onValueChange={setRandomize}
-                  trackColor={{ false: C.border, true: C.primary }}
-                  thumbColor="#fff"
-                />
-              </View>
-
-              {/* Start */}
-              <Button
-                label={`Start  ·  ${filteredCount} questions`}
-                onPress={handleStart}
-                disabled={!canStart}
-                style={styles.startBtn}
+          {/* Topics */}
+          <Text style={styles.sectionLabel}>
+            Topics{'  '}
+            <Text style={styles.optionalTag}>optional</Text>
+          </Text>
+          <View style={styles.chips}>
+            <FilterChip label="All Topics" selected={allTopicsOn} onPress={toggleAllTopics} />
+            {TOPIC_LIST.map((t) => (
+              <FilterChip
+                key={t}
+                label={t}
+                selected={selectedTopics.includes(t)}
+                onPress={() =>
+                  setSelectedTopics((prev) =>
+                    prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+                  )
+                }
               />
+            ))}
+          </View>
 
-              {filteredCount === 0 && (
-                <Text style={styles.noMatch}>
-                  No questions match your filters. Try selecting more topics.
-                </Text>
-              )}
-            </>
+          {/* Randomize */}
+          <View style={styles.toggleRow}>
+            <View>
+              <Text style={styles.toggleLabel}>Randomize order</Text>
+              <Text style={styles.toggleSub}>Shuffle questions every session</Text>
+            </View>
+            <Switch
+              value={randomize}
+              onValueChange={setRandomize}
+              trackColor={{ false: C.border, true: C.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          {/* Start */}
+          <Button
+            label={`Start  ·  ${filteredCount} questions`}
+            onPress={handleStart}
+            disabled={!canStart}
+            style={styles.startBtn}
+          />
+
+          {filteredCount === 0 && (
+            <Text style={styles.noMatch}>
+              No questions match your filters. Try selecting more topics.
+            </Text>
           )}
         </>
       )}

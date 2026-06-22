@@ -1,23 +1,16 @@
 import { supabase } from '../lib/supabase';
 import { ENV } from '../lib/env';
 import * as ImageManipulator from 'expo-image-manipulator';
+import type { LocationCode } from '../types/menu';
 
 const BUCKET = 'menu-images';
 
-export async function fetchMenuPhotos(): Promise<Record<string, string>> {
-  const { data, error } = await supabase
-    .from('menu_item_photos')
-    .select('csv_id, image_url');
-  if (error) {
-    console.warn('[photoService] fetchMenuPhotos error:', error.message);
-    return {};
-  }
-  const map: Record<string, string> = {};
-  data?.forEach((row) => { map[row.csv_id] = row.image_url; });
-  return map;
-}
-
-export async function uploadMenuPhoto(csvId: string, imageUri: string): Promise<string> {
+export async function uploadMenuPhoto(
+  menuItemId: string,
+  imageUri: string,
+  locations: LocationCode[],
+  note?: string,
+): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
@@ -29,9 +22,9 @@ export async function uploadMenuPhoto(csvId: string, imageUri: string): Promise<
 
   const response = await fetch(compressed.uri);
   const blob = await response.blob();
-  const path = `${csvId}.jpg`;
+  const photoId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const path = `${menuItemId}/${photoId}.jpg`;
 
-  // Use fetch directly so the blob is sent as raw binary (not multipart/form-data)
   const uploadResponse = await fetch(
     `${ENV.SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`,
     {
@@ -40,7 +33,6 @@ export async function uploadMenuPhoto(csvId: string, imageUri: string): Promise<
         Authorization: `Bearer ${session.access_token}`,
         apikey: ENV.SUPABASE_ANON_KEY,
         'Content-Type': 'image/jpeg',
-        'x-upsert': 'true',
       },
       body: blob,
     },
@@ -51,13 +43,35 @@ export async function uploadMenuPhoto(csvId: string, imageUri: string): Promise<
     throw new Error((err as { message?: string }).message ?? 'Upload failed');
   }
 
-  const publicUrl = `${ENV.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
+  const publicUrl = `${ENV.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
 
-  const { error: dbError } = await supabase
+  const { data: existing } = await supabase
     .from('menu_item_photos')
-    .upsert({ csv_id: csvId, image_url: publicUrl, updated_at: new Date().toISOString() });
+    .select('sort_order')
+    .eq('menu_item_id', menuItemId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  const nextOrder = existing && existing.length > 0
+    ? (existing[0] as { sort_order: number }).sort_order + 1
+    : 0;
+
+  const { error: dbError } = await supabase.from('menu_item_photos').insert({
+    menu_item_id: menuItemId,
+    image_url: publicUrl,
+    locations,
+    note: note ?? null,
+    sort_order: nextOrder,
+    uploaded_by: session.user.id,
+  });
 
   if (dbError) throw dbError;
+}
 
-  return publicUrl;
+export async function deleteMenuPhoto(photoId: string): Promise<void> {
+  const { error } = await supabase
+    .from('menu_item_photos')
+    .delete()
+    .eq('id', photoId);
+  if (error) throw error;
 }

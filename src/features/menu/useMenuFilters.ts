@@ -3,12 +3,11 @@ import type { MenuItem, MenuFilters, LocationCode } from '../../types/menu';
 import { EATERY_LOCATIONS } from '../../types/menu';
 import { isAvailableAt } from '../../utils/locationParser';
 
-export function useMenuFilters(items: MenuItem[] | undefined, defaultLocation: LocationCode) {
+export function useMenuFilters(items: MenuItem[] | undefined, location: LocationCode) {
   const [filters, setFilters] = useState<MenuFilters>({
     search: '',
     category: '',
     subCategory: '',
-    location: defaultLocation,
   });
 
   const categories = useMemo(() => {
@@ -26,20 +25,14 @@ export function useMenuFilters(items: MenuItem[] | undefined, defaultLocation: L
 
   const filtered = useMemo(() => {
     if (!items) return [];
-    let result = [...items];
-
-    if (filters.location !== 'ALL') {
-      result = result.filter((item) => isAvailableAt(item.locations, filters.location as LocationCode));
-    }
+    let result = items.filter((item) => isAvailableAt(item.locations, location));
 
     if (filters.category) {
       result = result.filter((item) => item.category === filters.category);
     }
-
     if (filters.subCategory) {
       result = result.filter((item) => item.subCategory === filters.subCategory);
     }
-
     if (filters.search.trim()) {
       const q = filters.search.trim().toLowerCase();
       result = result.filter(
@@ -51,17 +44,14 @@ export function useMenuFilters(items: MenuItem[] | undefined, defaultLocation: L
     }
 
     return result;
-  }, [items, filters]);
+  }, [items, location, filters]);
 
   const setSearch = (search: string) => setFilters((f) => ({ ...f, search }));
   const setCategory = (category: string) =>
     setFilters((f) => ({ ...f, category, subCategory: '' }));
   const setSubCategory = (subCategory: string) => setFilters((f) => ({ ...f, subCategory }));
-  const setLocation = (location: LocationCode | 'ALL') =>
-    setFilters((f) => ({ ...f, location }));
 
-  const isEatery =
-    filters.location !== 'ALL' && EATERY_LOCATIONS.includes(filters.location as 'VD' | 'NW');
+  const isEatery = EATERY_LOCATIONS.includes(location as 'VD' | 'NW');
 
   return {
     filters,
@@ -71,7 +61,6 @@ export function useMenuFilters(items: MenuItem[] | undefined, defaultLocation: L
     setSearch,
     setCategory,
     setSubCategory,
-    setLocation,
     isEatery,
   };
 }

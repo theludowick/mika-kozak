@@ -1,115 +1,75 @@
 import { useQuery } from '@tanstack/react-query';
-import { z } from 'zod';
-import { fetchCSV } from './csvService';
-import { ENV } from '../lib/env';
+import { supabase } from '../lib/supabase';
 import { QUERY_KEYS } from '../constants/queryKeys';
-import { QuizRowSchema } from '../types/quiz';
 import type { ParsedQuestion, MultipleChoiceQuestion, OpenAnswerQuestion } from '../types/quiz';
-import {
-  parseCorrectIndices,
-  buildShuffledOptions,
-  parseFormat,
-  isActiveQuestion,
-} from '../utils/quizNormalizer';
-import { splitDelimited } from '../utils/csvParser';
-import { parseLocations } from '../utils/locationParser';
+import type { LocationCode } from '../types/menu';
+import { ALL_LOCATIONS } from '../types/menu';
+import { parseCorrectIndices, buildShuffledOptions, parseFormat } from '../utils/quizNormalizer';
 import { normaliseImageUrl } from '../utils/imageUtils';
-import { generateRowId } from '../utils/idGenerator';
 
-function normaliseHeader(raw: string): string {
-  return raw.toLowerCase().replace(/\s+/g, '');
+interface QuizRow {
+  id: string;
+  format: string;
+  topics: string[];
+  positions: string[];
+  locations: string[];
+  item: string;
+  question: string;
+  option_a: string | null;
+  option_b: string | null;
+  option_c: string | null;
+  option_d: string | null;
+  correct: string | null;
+  model_answer: string | null;
+  image_url: string | null;
 }
 
-/**
- * Map a raw CSV row (any casing) to the canonical QuizRow shape.
- * Handles headers like "OptionA", "optiona", "option_a" gracefully.
- */
-function canonicaliseRow(raw: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [key, val] of Object.entries(raw)) {
-    const norm = normaliseHeader(key);
-    // Map known variant spellings to canonical keys
-    const canonical = HEADER_MAP[norm] ?? key;
-    out[canonical] = val;
-  }
-  return out;
-}
-
-const HEADER_MAP: Record<string, string> = {
-  id: 'ID',
-  format: 'Format',
-  topics: 'Topics',
-  positions: 'Positions',
-  location: 'Location',
-  item: 'Item',
-  question: 'Question',
-  optiona: 'OptionA',
-  optionb: 'OptionB',
-  optionc: 'OptionC',
-  optiond: 'OptionD',
-  correct: 'Correct',
-  modelanswer: 'ModelAnswer',
-  image: 'Image',
-  status: 'Status',
-};
-
-function parseRow(raw: Record<string, string>, rowIndex: number): ParsedQuestion | null {
-  const canonical = canonicaliseRow(raw);
-  const parsed = QuizRowSchema.safeParse(canonical);
-
-  if (!parsed.success) {
-    if (__DEV__) {
-      console.warn(`[quizService] Row ${rowIndex} validation failed:`, parsed.error.issues[0]);
-    }
-    return null;
-  }
-
-  const row = parsed.data;
-
-  if (!isActiveQuestion(row.Status)) return null;
-
-  const format = parseFormat(row.Format);
-  const id =
-    row.ID?.trim() ||
-    generateRowId([row.Format ?? '', row.Question ?? '', row.Item ?? '', String(rowIndex)]);
+function parseRow(row: QuizRow): ParsedQuestion | null {
+  const format = parseFormat(row.format);
 
   const base = {
-    id,
+    id: row.id,
     format,
-    topics: splitDelimited(row.Topics),
-    positions: splitDelimited(row.Positions).map((p) => p.toLowerCase()),
-    locations: parseLocations(row.Location),
-    item: (row.Item ?? '').trim(),
-    question: (row.Question ?? row.Item ?? '').trim(),
-    imageUrl: normaliseImageUrl(row.Image),
+    topics: row.topics ?? [],
+    positions: row.positions ?? [],
+    locations: (row.locations ?? []).filter(
+      (l): l is LocationCode => ALL_LOCATIONS.includes(l as LocationCode),
+    ),
+    item: row.item ?? '',
+    question: row.question ?? '',
+    imageUrl: normaliseImageUrl(row.image_url ?? undefined),
   };
 
   if (format === 'CS' || format === 'CM' || format === 'CI') {
-    const rawOpts = [row.OptionA, row.OptionB, row.OptionC, row.OptionD];
-    const correctIndices = parseCorrectIndices(row.Correct);
-    const options = buildShuffledOptions(rawOpts, correctIndices);
-
+    const correctIndices = parseCorrectIndices(row.correct ?? undefined);
+    const options = buildShuffledOptions(
+      [row.option_a ?? undefined, row.option_b ?? undefined, row.option_c ?? undefined, row.option_d ?? undefined],
+      correctIndices,
+    );
     if (!options) return null;
-
     return { ...base, format, options } satisfies MultipleChoiceQuestion;
   }
 
   return {
     ...base,
     format: 'OA',
-    modelAnswer: (row.ModelAnswer ?? '').trim(),
+    modelAnswer: row.model_answer ?? '',
   } satisfies OpenAnswerQuestion;
 }
 
 async function fetchQuizQuestions(): Promise<ParsedQuestion[]> {
-  const { data } = await fetchCSV(ENV.QUIZ_CSV_URL);
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .select('id, format, topics, positions, locations, item, question, option_a, option_b, option_c, option_d, correct, model_answer, image_url')
+    .eq('status', 'published');
+
+  if (error) throw new Error(error.message);
+
   const questions: ParsedQuestion[] = [];
-
-  data.forEach((row, i) => {
-    const q = parseRow(row, i + 1);
+  for (const row of data ?? []) {
+    const q = parseRow(row as QuizRow);
     if (q) questions.push(q);
-  });
-
+  }
   return questions;
 }
 

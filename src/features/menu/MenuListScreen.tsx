@@ -16,10 +16,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useMenuItems } from '../../services/menuService';
 import { useMenuFilters } from './useMenuFilters';
-import { useSelectedLocation } from '../../hooks/useSelectedLocation';
+import { useLocation } from '../../contexts/LocationContext';
 import { QUERY_KEYS } from '../../constants/queryKeys';
-import type { MenuItem, LocationCode } from '../../types/menu';
-import { ALL_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
+import type { MenuItem } from '../../types/menu';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -53,7 +52,6 @@ function buildRows(
     return rows;
   }
 
-  // Grid mode
   const rows: FlatRow[] = [];
   let lastCat = '\0';
   let bucket: MenuItem[] = [];
@@ -79,8 +77,6 @@ function buildRows(
   return rows;
 }
 
-// ── Column count ─────────────────────────────────────────────────────────────
-
 function getGridCols(w: number): number {
   if (Platform.OS !== 'web') return 2;
   if (w >= 1400) return 6;
@@ -90,8 +86,6 @@ function getGridCols(w: number): number {
   return 2;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 const GRID_PADDING = 12;
 const GRID_GAP     = 8;
 
@@ -99,7 +93,7 @@ export function MenuListScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { width: windowWidth } = useWindowDimensions();
-  const { location: defaultLocation, setLocation: setSavedLocation } = useSelectedLocation();
+  const { location } = useLocation();
   const { data: items, isLoading, isError, error, refetch, isFetching } = useMenuItems();
 
   const [viewMode,    setViewMode]    = useState<ViewMode>('grid');
@@ -113,13 +107,7 @@ export function MenuListScreen() {
     setSearch,
     setCategory,
     setSubCategory,
-    setLocation,
-  } = useMenuFilters(items, defaultLocation);
-
-  const handleLocationChange = (loc: LocationCode) => {
-    setLocation(loc);
-    setSavedLocation(loc);
-  };
+  } = useMenuFilters(items, location);
 
   const gridCols      = getGridCols(windowWidth);
   const gridItemWidth = (windowWidth - GRID_PADDING * 2 - GRID_GAP * (gridCols - 1)) / gridCols;
@@ -161,22 +149,6 @@ export function MenuListScreen() {
             </View>
           )}
         </TouchableOpacity>
-      </View>
-
-      {/* Location — always visible, no "All" option */}
-      <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>Location</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {ALL_LOCATIONS.map((loc) => (
-            <Chip
-              key={loc}
-              label={LOCATION_NAMES[loc]}
-              active={filters.location === loc}
-              onPress={() => handleLocationChange(loc)}
-              variant="primary"
-            />
-          ))}
-        </ScrollView>
       </View>
 
       {/* Category + sub-category — behind filter toggle */}
@@ -223,7 +195,6 @@ export function MenuListScreen() {
       <View style={styles.resultsBar}>
         <Text style={styles.resultCount}>
           {filtered.length} item{filtered.length !== 1 ? 's' : ''}
-          {filters.location !== 'ALL' ? ` · ${LOCATION_NAMES[filters.location as LocationCode]}` : ''}
         </Text>
         <View style={styles.viewToggle}>
           <TouchableOpacity
@@ -348,7 +319,6 @@ function GridRow({
           </View>
         </TouchableOpacity>
       ))}
-      {/* Phantom cells to keep alignment in last row */}
       {Array.from({ length: cols - items.length }).map((_, i) => (
         <View key={`ph-${i}`} style={{ width: itemWidth }} />
       ))}
@@ -483,7 +453,6 @@ const styles = StyleSheet.create({
   viewBtnIcon:       { fontSize: 16, color: C.textMuted },
   viewBtnIconActive: { color: C.primary },
 
-  // Category header
   catHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -501,7 +470,6 @@ const styles = StyleSheet.create({
   },
   catHeaderLine: { flex: 1, height: 1, backgroundColor: C.border },
 
-  // Grid
   gridList: { paddingBottom: 40 },
   gridRow:  {
     flexDirection: 'row',
@@ -520,7 +488,6 @@ const styles = StyleSheet.create({
   gridName:  { fontSize: 12, color: C.text,     fontFamily: FONT.semiBold, lineHeight: 17 },
   gridSub:   { fontSize: 10, color: C.textSub,  fontFamily: FONT.regular },
 
-  // List
   flatList: { padding: 12, paddingTop: 6, paddingBottom: 40 },
   listCard: {
     flexDirection: 'row',

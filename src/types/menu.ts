@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// ── Raw CSV row schema ──────────────────────────────────────────────────────
+// ── Raw CSV row schema (kept for tests / legacy reference) ──────────────────
 
 export const MenuRowSchema = z.object({
   id: z.string().optional(),
@@ -42,6 +42,16 @@ export const LOCATION_NAMES: Record<LocationCode, string> = {
   NT: 'North Vancouver',
 };
 
+// ── Photo ───────────────────────────────────────────────────────────────────
+
+export interface MenuItemPhoto {
+  id: string;
+  imageUrl: string;
+  locations: LocationCode[];
+  note: string | null;
+  sortOrder: number;
+}
+
 // ── Parsed menu item ────────────────────────────────────────────────────────
 
 export interface MenuItemFields {
@@ -53,16 +63,19 @@ export interface MenuItemFields {
 }
 
 export interface MenuItem {
-  /** Stable composite ID derived from name + category — used for navigation */
+  /** Supabase UUID — used for navigation and DB references */
   id: string;
-  /** User-defined ID from the CSV `id` column — used to resolve related items */
+  /** Original CSV id column value — used to resolve related items */
   csvId: string;
   relatedIds: string[];
   name: string;
   category: string;
   subCategory: string;
   locations: LocationCode[];
+  /** Thumbnail: first uploaded photo URL, or legacy CSV image URL */
   imageUrl: string | null;
+  /** All uploaded photos for this item, ordered by sort_order */
+  photos: MenuItemPhoto[];
   eatery: MenuItemFields;
   restaurant: MenuItemFields;
 }
@@ -73,5 +86,4 @@ export interface MenuFilters {
   search: string;
   category: string;
   subCategory: string;
-  location: LocationCode | 'ALL';
 }
