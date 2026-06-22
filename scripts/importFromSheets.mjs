@@ -234,11 +234,21 @@ async function main() {
   const rawQuiz = await fetchCsv(QUIZ_CSV_URL);
   console.log(`    ${rawQuiz.length} raw rows`);
 
-  const menuItems = rawMenu.map((r, i) => parseMenuRow(r, i + 1)).filter(Boolean);
-  console.log(`\n✔   Parsed ${menuItems.length} menu items`);
+  const allMenuItems = rawMenu.map((r, i) => parseMenuRow(r, i + 1)).filter(Boolean);
+  // Deduplicate by csv_id — last row wins (matches spreadsheet behaviour)
+  const menuItemMap = new Map();
+  for (const item of allMenuItems) {
+    const key = item.csv_id ?? `__null_${menuItemMap.size}`;
+    menuItemMap.set(key, item);
+  }
+  const menuItems = [...menuItemMap.values()];
+  console.log(`\n✔   Parsed ${menuItems.length} menu items (${allMenuItems.length - menuItems.length} duplicates removed)`);
 
-  const quizQuestions = rawQuiz.map((r, i) => parseQuizRow(r, i + 1)).filter(Boolean);
-  console.log(`✔   Parsed ${quizQuestions.length} quiz questions`);
+  const allQuizQuestions = rawQuiz.map((r, i) => parseQuizRow(r, i + 1)).filter(Boolean);
+  const quizMap = new Map();
+  for (const q of allQuizQuestions) quizMap.set(q.id, q);
+  const quizQuestions = [...quizMap.values()];
+  console.log(`✔   Parsed ${quizQuestions.length} quiz questions (${allQuizQuestions.length - quizQuestions.length} duplicates removed)`);
 
   console.log('\n📤  Inserting menu items…');
   await upsertChunked('menu_items', menuItems, 'csv_id');
