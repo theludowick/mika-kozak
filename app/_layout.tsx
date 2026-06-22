@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 import { queryClient } from '../src/lib/queryClient';
 import { AuthProvider } from '../src/features/auth/AuthContext';
+import { LocationProvider } from '../src/contexts/LocationContext';
 import { StyleSheet } from 'react-native';
 import { C, FONT } from '../src/constants/theme';
 
@@ -33,6 +34,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <LocationProvider>
             <StatusBar style="light" />
             <Stack
               screenOptions={{
@@ -55,6 +57,7 @@ export default function RootLayout() {
                 options={{ title: 'Results', headerBackTitle: 'Quiz' }}
               />
             </Stack>
+            </LocationProvider>
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

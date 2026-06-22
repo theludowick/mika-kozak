@@ -1,44 +1,37 @@
 import React, { useState, useMemo } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
-  Platform,
-  useWindowDimensions,
+  View, Text, FlatList, StyleSheet, TextInput, TouchableOpacity,
+  ScrollView, RefreshControl, Platform, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { useMenuItems } from '../../services/menuService';
+import { useMenuItems, bulkMoveCategory } from '../../services/menuService';
+import { useCategories } from '../../services/categoryService';
+import { moveItemsToTrash } from '../../services/trashService';
 import { useMenuFilters } from './useMenuFilters';
 import { useLocation } from '../../contexts/LocationContext';
+import { useAuth } from '../auth/AuthContext';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import type { MenuItem } from '../../types/menu';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { CategoryEditModal } from './components/CategoryEditModal';
+import { SubCategoryEditModal } from './components/SubCategoryEditModal';
+import { BulkActionBar } from './components/BulkActionBar';
 import { C, FONT } from '../../constants/theme';
 
 type ViewMode = 'grid' | 'list';
 
-// ── Row-based flat list items ────────────────────────────────────────────────
+// ── Row-based flat list items ─────────────────────────────────────────────────
 
 type FlatRow =
   | { _type: 'catHeader'; category: string }
   | { _type: 'gridRow';   items: MenuItem[]; cols: number }
   | { _type: 'listItem';  item: MenuItem };
 
-function buildRows(
-  items: MenuItem[],
-  viewMode: ViewMode,
-  cols: number,
-  withHeaders: boolean,
-): FlatRow[] {
+function buildRows(items: MenuItem[], viewMode: ViewMode, cols: number, withHeaders: boolean): FlatRow[] {
   if (viewMode === 'list') {
     const rows: FlatRow[] = [];
     let lastCat = '\0';
@@ -73,7 +66,6 @@ function buildRows(
     if (bucket.length === cols) flushBucket();
   });
   flushBucket();
-
   return rows;
 }
 
@@ -90,24 +82,29 @@ const GRID_PADDING = 12;
 const GRID_GAP     = 8;
 
 export function MenuListScreen() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
+  const router        = useRouter();
+  const queryClient   = useQueryClient();
   const { width: windowWidth } = useWindowDimensions();
-  const { location } = useLocation();
-  const { data: items, isLoading, isError, error, refetch, isFetching } = useMenuItems();
+  const { location }  = useLocation();
+  const { isAdmin }   = useAuth();
 
-  const [viewMode,    setViewMode]    = useState<ViewMode>('grid');
-  const [showFilters, setShowFilters] = useState(false);
+  const { data: items,      isLoading,  isError,   error,  refetch, isFetching } = useMenuItems();
+  const { data: categories, isLoading: catLoading, isError: catError } = useCategories();
 
-  const {
-    filters,
-    filtered,
-    categories,
-    subCategories,
-    setSearch,
-    setCategory,
-    setSubCategory,
-  } = useMenuFilters(items, location);
+  const [viewMode,          setViewMode]          = useState<ViewMode>('grid');
+  const [showFilters,       setShowFilters]       = useState(false);
+  const [categoryEditOpen,    setCategoryEditOpen]    = useState(false);
+  const [subCategoryEditOpen, setSubCategoryEditOpen] = useState(false);
+  const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
+  const isSelecting = selectedIds.size > 0;
+
+  const categoryOrder = useMemo(
+    () => (categories ?? []).map((c) => c.name),
+    [categories],
+  );
+
+  const { filters, filtered, categories: filterCategories, subCategories, setSearch, setCategory, setSubCategory } =
+    useMenuFilters(items, location, categoryOrder);
 
   const gridCols      = getGridCols(windowWidth);
   const gridItemWidth = (windowWidth - GRID_PADDING * 2 - GRID_GAP * (gridCols - 1)) / gridCols;
@@ -118,9 +115,27 @@ export function MenuListScreen() {
     [filtered, viewMode, gridCols, showFilters],
   );
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkMove = async (category: string) => {
+    await bulkMoveCategory([...selectedIds], category);
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
+  };
+
+  const handleBulkDelete = async () => {
+    const toDelete = (items ?? []).filter((i) => selectedIds.has(i.id));
+    await moveItemsToTrash(toDelete);
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
+  };
+
   if (isLoading) return <LoadingState message="Loading menu…" />;
-  if (isError)
-    return <ErrorState message={(error as Error).message} onRetry={() => void refetch()} />;
+  if (isError) return <ErrorState message={(error as Error).message} onRetry={() => void refetch()} />;
 
   return (
     <View style={styles.container}>
@@ -132,17 +147,13 @@ export function MenuListScreen() {
           placeholderTextColor={C.textMuted}
           value={filters.search}
           onChangeText={setSearch}
-          accessibilityLabel="Search menu items"
           returnKeyType="search"
         />
         <TouchableOpacity
           style={[styles.filterBtn, showFilters && styles.filterBtnActive]}
           onPress={() => setShowFilters((v) => !v)}
-          accessibilityLabel="Toggle category filters"
         >
-          <Text style={[styles.filterBtnText, showFilters && styles.filterBtnTextActive]}>
-            FILTER
-          </Text>
+          <Text style={[styles.filterBtnText, showFilters && styles.filterBtnTextActive]}>FILTER</Text>
           {activeFilters > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilters}</Text>
@@ -151,22 +162,17 @@ export function MenuListScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Category + sub-category — behind filter toggle */}
+      {/* Category + sub-category filters */}
       {showFilters && (
         <View style={styles.expandedFilters}>
-          {categories.length > 0 && (
+          {filterCategories.length > 0 && (
             <View style={styles.filterSection}>
               <Text style={styles.filterLabel}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                 <Chip label="All" active={!filters.category} onPress={() => setCategory('')} variant="accent" />
-                {categories.map((cat) => (
-                  <Chip
-                    key={cat}
-                    label={cat}
-                    active={filters.category === cat}
-                    onPress={() => setCategory(filters.category === cat ? '' : cat)}
-                    variant="accent"
-                  />
+                {filterCategories.map((cat) => (
+                  <Chip key={cat} label={cat} active={filters.category === cat}
+                    onPress={() => setCategory(filters.category === cat ? '' : cat)} variant="accent" />
                 ))}
               </ScrollView>
             </View>
@@ -177,13 +183,8 @@ export function MenuListScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
                 <Chip label="All" active={!filters.subCategory} onPress={() => setSubCategory('')} variant="accent" />
                 {subCategories.map((sub) => (
-                  <Chip
-                    key={sub}
-                    label={sub}
-                    active={filters.subCategory === sub}
-                    onPress={() => setSubCategory(filters.subCategory === sub ? '' : sub)}
-                    variant="accent"
-                  />
+                  <Chip key={sub} label={sub} active={filters.subCategory === sub}
+                    onPress={() => setSubCategory(filters.subCategory === sub ? '' : sub)} variant="accent" />
                 ))}
               </ScrollView>
             </View>
@@ -191,23 +192,31 @@ export function MenuListScreen() {
         </View>
       )}
 
-      {/* Results bar + view toggle */}
+      {/* Results bar + view toggle + admin Edit category button */}
       <View style={styles.resultsBar}>
         <Text style={styles.resultCount}>
           {filtered.length} item{filtered.length !== 1 ? 's' : ''}
         </Text>
         <View style={styles.viewToggle}>
+          {isAdmin && (
+            <>
+              <TouchableOpacity style={styles.editCatBtn} onPress={() => setCategoryEditOpen(true)}>
+                <Text style={styles.editCatBtnText}>Categories</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.editCatBtn} onPress={() => setSubCategoryEditOpen(true)}>
+                <Text style={styles.editCatBtnText}>Sub-cats</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity
             style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
             onPress={() => setViewMode('grid')}
-            accessibilityLabel="Grid view"
           >
             <Text style={[styles.viewBtnIcon, viewMode === 'grid' && styles.viewBtnIconActive]}>⊞</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.viewBtn, viewMode === 'list' && styles.viewBtnActive]}
             onPress={() => setViewMode('list')}
-            accessibilityLabel="List view"
           >
             <Text style={[styles.viewBtnIcon, viewMode === 'list' && styles.viewBtnIconActive]}>☰</Text>
           </TouchableOpacity>
@@ -224,21 +233,34 @@ export function MenuListScreen() {
           return `li-${row.item.id}`;
         }}
         renderItem={({ item: row }) => {
-          if (row._type === 'catHeader') {
-            return <CategoryHeader label={row.category} />;
-          }
+          if (row._type === 'catHeader') return <CategoryHeader label={row.category} />;
           if (row._type === 'gridRow') {
             return (
               <GridRow
                 items={row.items}
                 cols={row.cols}
                 itemWidth={gridItemWidth}
-                onPress={(item) => router.push(`/menu/${item.id}`)}
+                isAdmin={isAdmin}
+                selectedIds={selectedIds}
+                onPress={(item) => {
+                  if (isSelecting && isAdmin) { toggleSelect(item.id); return; }
+                  router.push(`/menu/${item.id}`);
+                }}
+                onLongPress={(item) => { if (isAdmin) toggleSelect(item.id); }}
               />
             );
           }
           return (
-            <ListCard item={row.item} onPress={() => router.push(`/menu/${row.item.id}`)} />
+            <ListCard
+              item={row.item}
+              isAdmin={isAdmin}
+              selected={selectedIds.has(row.item.id)}
+              onPress={() => {
+                if (isSelecting && isAdmin) { toggleSelect(row.item.id); return; }
+                router.push(`/menu/${row.item.id}`);
+              }}
+              onLongPress={() => { if (isAdmin) toggleSelect(row.item.id); }}
+            />
           );
         }}
         contentContainerStyle={viewMode === 'grid' ? styles.gridList : styles.flatList}
@@ -252,6 +274,35 @@ export function MenuListScreen() {
             tintColor={C.primary}
           />
         }
+      />
+
+      {/* Bulk action bar */}
+      {isSelecting && isAdmin && (
+        <BulkActionBar
+          selectedCount={selectedIds.size}
+          categories={categories ?? []}
+          onMoveCategory={handleBulkMove}
+          onDelete={handleBulkDelete}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
+
+      {/* Category edit modal */}
+      <CategoryEditModal
+        visible={categoryEditOpen}
+        categories={categories ?? []}
+        items={items ?? []}
+        isLoading={catLoading}
+        isError={catError}
+        onClose={() => setCategoryEditOpen(false)}
+      />
+
+      {/* Sub-category edit modal */}
+      <SubCategoryEditModal
+        visible={subCategoryEditOpen}
+        categories={categories ?? []}
+        items={items ?? []}
+        onClose={() => setSubCategoryEditOpen(false)}
       />
     </View>
   );
@@ -284,41 +335,50 @@ function CategoryHeader({ label }: { label: string }) {
 }
 
 function GridRow({
-  items,
-  cols,
-  itemWidth,
-  onPress,
+  items, cols, itemWidth, isAdmin, selectedIds, onPress, onLongPress,
 }: {
   items: MenuItem[];
   cols: number;
   itemWidth: number;
+  isAdmin: boolean;
+  selectedIds: Set<string>;
   onPress: (item: MenuItem) => void;
+  onLongPress: (item: MenuItem) => void;
 }) {
   return (
     <View style={[styles.gridRow, { gap: GRID_GAP }]}>
-      {items.map((item) => (
-        <TouchableOpacity
-          key={item.id}
-          style={[styles.gridCard, { width: itemWidth }]}
-          onPress={() => onPress(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${item.name}`}
-        >
-          {item.imageUrl ? (
-            <Image source={{ uri: item.imageUrl }} style={styles.gridImage} contentFit="cover" transition={200} />
-          ) : (
-            <View style={[styles.gridImage, styles.imagePlaceholder]} />
-          )}
-          <View style={styles.gridBody}>
-            <Text style={styles.gridName} numberOfLines={2}>{item.name}</Text>
-            {item.subCategory ? (
-              <Text style={styles.gridSub} numberOfLines={1}>{item.subCategory}</Text>
-            ) : item.category ? (
-              <Text style={styles.gridSub} numberOfLines={1}>{item.category}</Text>
-            ) : null}
-          </View>
-        </TouchableOpacity>
-      ))}
+      {items.map((item) => {
+        const selected = selectedIds.has(item.id);
+        return (
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.gridCard, { width: itemWidth }, selected && styles.cardSelected]}
+            onPress={() => onPress(item)}
+            onLongPress={() => onLongPress(item)}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.name}`}
+          >
+            {selected && (
+              <View style={styles.checkOverlay}>
+                <Text style={styles.checkMark}>✓</Text>
+              </View>
+            )}
+            {item.imageUrl ? (
+              <Image source={{ uri: item.imageUrl }} style={styles.gridImage} contentFit="cover" transition={200} />
+            ) : (
+              <View style={[styles.gridImage, styles.imagePlaceholder]} />
+            )}
+            <View style={styles.gridBody}>
+              <Text style={styles.gridName} numberOfLines={2}>{item.name}</Text>
+              {item.subCategory ? (
+                <Text style={styles.gridSub} numberOfLines={1}>{item.subCategory}</Text>
+              ) : item.category ? (
+                <Text style={styles.gridSub} numberOfLines={1}>{item.category}</Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
       {Array.from({ length: cols - items.length }).map((_, i) => (
         <View key={`ph-${i}`} style={{ width: itemWidth }} />
       ))}
@@ -326,23 +386,39 @@ function GridRow({
   );
 }
 
-function ListCard({ item, onPress }: { item: MenuItem; onPress: () => void }) {
+function ListCard({
+  item, isAdmin, selected, onPress, onLongPress,
+}: {
+  item: MenuItem;
+  isAdmin: boolean;
+  selected: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
   return (
     <TouchableOpacity
-      style={styles.listCard}
+      style={[styles.listCard, selected && styles.cardSelected]}
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityLabel={`View ${item.name}`}
     >
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.listImage} contentFit="cover" transition={200} />
-      ) : (
-        <View style={[styles.listImage, styles.imagePlaceholder]} />
-      )}
+      <View style={styles.listImageWrap}>
+        {item.imageUrl ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.listImage} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.listImage, styles.imagePlaceholder]} />
+        )}
+        {selected && (
+          <View style={styles.listCheckOverlay}>
+            <Text style={styles.checkMark}>✓</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.listBody}>
         <Text style={styles.listName}>{item.name}</Text>
-        {item.category    ? <Text style={styles.listMeta}>{item.category}</Text>    : null}
-        {item.subCategory ? <Text style={styles.listSub}>{item.subCategory}</Text>  : null}
+        {item.category    ? <Text style={styles.listMeta}>{item.category}</Text>   : null}
+        {item.subCategory ? <Text style={styles.listSub}>{item.subCategory}</Text> : null}
       </View>
       <Text style={styles.listArrow}>›</Text>
     </TouchableOpacity>
@@ -355,156 +431,105 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4,
   },
   searchInput: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    color: C.text,
-    fontSize: 15,
-    fontFamily: FONT.regular,
-    minHeight: 46,
+    flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11,
+    color: C.text, fontSize: 15, fontFamily: FONT.regular, minHeight: 46,
   },
   filterBtn: {
-    height: 46,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    height: 46, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1,
+    borderColor: C.border, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center',
   },
-  filterBtnActive:    { borderColor: C.primary, backgroundColor: C.primaryMuted },
-  filterBtnText:      { fontSize: 11, letterSpacing: 1.5, fontFamily: FONT.semiBold, color: C.textSub },
-  filterBtnTextActive:{ color: C.primary },
+  filterBtnActive:     { borderColor: C.primary, backgroundColor: C.primaryMuted },
+  filterBtnText:       { fontSize: 11, letterSpacing: 1.5, fontFamily: FONT.semiBold, color: C.textSub },
+  filterBtnTextActive: { color: C.primary },
   filterBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: C.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 6, right: 6,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center',
   },
   filterBadgeText: { fontSize: 9, color: '#fff', fontFamily: FONT.bold },
 
-  filterSection: { paddingTop: 10 },
+  expandedFilters: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 10, paddingTop: 2 },
+  filterSection:   { paddingTop: 10 },
   filterLabel: {
-    fontSize: 10,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: C.textMuted,
-    fontFamily: FONT.semiBold,
-    paddingHorizontal: 14,
-    marginBottom: 7,
+    fontSize: 10, letterSpacing: 2, textTransform: 'uppercase',
+    color: C.textMuted, fontFamily: FONT.semiBold, paddingHorizontal: 14, marginBottom: 7,
   },
   chipRow: { paddingHorizontal: 12, gap: 7, flexDirection: 'row' },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
   },
   chipText: { fontSize: 13, color: C.textSub, fontFamily: FONT.medium },
 
-  expandedFilters: {
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    marginTop: 10,
-    paddingTop: 2,
-  },
-
   resultsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 4,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4,
   },
-  resultCount:       { fontSize: 12, color: C.textMuted, fontFamily: FONT.regular },
-  viewToggle:        { flexDirection: 'row', gap: 4 },
+  resultCount:      { fontSize: 12, color: C.textMuted, fontFamily: FONT.regular },
+  viewToggle:       { flexDirection: 'row', gap: 6, alignItems: 'center' },
+
+  editCatBtn: {
+    height: 34, paddingHorizontal: 12, borderRadius: 9,
+    borderWidth: 1, borderColor: C.borderBright, backgroundColor: C.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editCatBtnText: { fontSize: 12, color: C.textSub, fontFamily: FONT.semiBold },
+
   viewBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 34, height: 34, borderRadius: 9, borderWidth: 1,
+    borderColor: C.border, backgroundColor: C.surface,
+    alignItems: 'center', justifyContent: 'center',
   },
   viewBtnActive:     { borderColor: C.primary, backgroundColor: C.primaryMuted },
   viewBtnIcon:       { fontSize: 16, color: C.textMuted },
   viewBtnIconActive: { color: C.primary },
 
   catHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: GRID_PADDING,
-    paddingTop: 16,
-    paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: GRID_PADDING, paddingTop: 16, paddingBottom: 10,
   },
   catHeaderText: {
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: C.textSub,
-    fontFamily: FONT.semiBold,
+    fontSize: 11, letterSpacing: 2, textTransform: 'uppercase',
+    color: C.textSub, fontFamily: FONT.semiBold,
   },
   catHeaderLine: { flex: 1, height: 1, backgroundColor: C.border },
 
   gridList: { paddingBottom: 40 },
-  gridRow:  {
-    flexDirection: 'row',
-    paddingHorizontal: GRID_PADDING,
-    marginBottom: GRID_GAP,
-  },
-  gridCard: {
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
+  gridRow:  { flexDirection: 'row', paddingHorizontal: GRID_PADDING, marginBottom: GRID_GAP },
+  gridCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, overflow: 'hidden' },
   gridImage: { width: '100%', aspectRatio: 1 },
   gridBody:  { padding: 8, gap: 2 },
-  gridName:  { fontSize: 12, color: C.text,     fontFamily: FONT.semiBold, lineHeight: 17 },
-  gridSub:   { fontSize: 10, color: C.textSub,  fontFamily: FONT.regular },
+  gridName:  { fontSize: 12, color: C.text,    fontFamily: FONT.semiBold, lineHeight: 17 },
+  gridSub:   { fontSize: 10, color: C.textSub, fontFamily: FONT.regular },
 
   flatList: { padding: 12, paddingTop: 6, paddingBottom: 40 },
   listCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 14,
-    marginBottom: 10,
-    overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface,
+    borderWidth: 1, borderColor: C.border, borderRadius: 14, marginBottom: 10, overflow: 'hidden',
   },
-  listImage: { width: 76, height: 76 },
-  listBody:  { flex: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
-  listName:  { fontSize: 15, color: C.text,      fontFamily: FONT.semiBold },
-  listMeta:  { fontSize: 12, color: C.primary,   fontFamily: FONT.medium },
-  listSub:   { fontSize: 11, color: C.textMuted,  fontFamily: FONT.regular },
-  listArrow: { fontSize: 20, color: C.textMuted,  paddingRight: 14 },
+  listImageWrap: { position: 'relative' },
+  listImage:     { width: 76, height: 76 },
+  listBody:      { flex: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
+  listName:      { fontSize: 15, color: C.text,     fontFamily: FONT.semiBold },
+  listMeta:      { fontSize: 12, color: C.primary,  fontFamily: FONT.medium },
+  listSub:       { fontSize: 11, color: C.textMuted, fontFamily: FONT.regular },
+  listArrow:     { fontSize: 20, color: C.textMuted, paddingRight: 14 },
+
+  cardSelected:  { borderColor: C.primary, backgroundColor: C.primaryMuted },
+  checkOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(123,120,255,0.3)', alignItems: 'center', justifyContent: 'center', zIndex: 1,
+  },
+  listCheckOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(123,120,255,0.4)', alignItems: 'center', justifyContent: 'center',
+  },
+  checkMark: { fontSize: 24, color: '#fff', fontFamily: FONT.bold },
 
   imagePlaceholder: { backgroundColor: C.surfaceHigh },
 });

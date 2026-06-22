@@ -1,7 +1,7 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useAuth } from '../../src/features/auth/AuthContext';
 import { LoadingState } from '../../src/components/ui/LoadingState';
-import { LocationProvider, LocationHeaderButton } from '../../src/contexts/LocationContext';
+import { LocationHeaderButton } from '../../src/contexts/LocationContext';
 import { C, FONT } from '../../src/constants/theme';
 
 export default function TabsLayout() {
@@ -11,8 +11,7 @@ export default function TabsLayout() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   return (
-    <LocationProvider>
-      <Tabs
+    <Tabs
         screenOptions={{
           tabBarStyle: {
             backgroundColor: C.surface,
@@ -49,7 +48,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-    </LocationProvider>
   );
 }
 

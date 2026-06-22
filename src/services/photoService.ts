@@ -68,10 +68,35 @@ export async function uploadMenuPhoto(
   if (dbError) throw dbError;
 }
 
-export async function deleteMenuPhoto(photoId: string): Promise<void> {
+export async function deleteMenuPhoto(photoId: string, imageUrl: string): Promise<void> {
+  const urlObj = new URL(imageUrl);
+  const pathParts = urlObj.pathname.split('/object/public/menu-images/');
+  if (pathParts[1]) {
+    await supabase.storage.from('menu-images').remove([pathParts[1]]);
+  }
+  const { error } = await supabase.from('menu_item_photos').delete().eq('id', photoId);
+  if (error) throw error;
+}
+
+export async function updatePhotoMeta(
+  photoId: string,
+  locations: LocationCode[],
+  note: string | null,
+): Promise<void> {
   const { error } = await supabase
     .from('menu_item_photos')
-    .delete()
+    .update({ locations, note })
     .eq('id', photoId);
   if (error) throw error;
+}
+
+export async function reorderPhotos(
+  menuItemId: string,
+  orderedIds: string[],
+): Promise<void> {
+  await Promise.all(
+    orderedIds.map((id, idx) =>
+      supabase.from('menu_item_photos').update({ sort_order: idx }).eq('id', id),
+    ),
+  );
 }

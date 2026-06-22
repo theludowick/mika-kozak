@@ -60,7 +60,13 @@ export interface MenuItemFields {
   presentation: string;
   takeout: string;
   facts: string;
+  upsell: string;
 }
+
+// Per-location field overrides; any subset of MenuItemFields plus optional relatedIds
+export type MenuItemOverrides = Partial<
+  Record<LocationCode, Partial<MenuItemFields & { relatedIds: string[] }>>
+>;
 
 export interface MenuItem {
   /** Supabase UUID — used for navigation and DB references */
@@ -76,8 +82,28 @@ export interface MenuItem {
   imageUrl: string | null;
   /** All uploaded photos for this item, ordered by sort_order */
   photos: MenuItemPhoto[];
-  eatery: MenuItemFields;
-  restaurant: MenuItemFields;
+  fields: MenuItemFields;       // base values shared across locations
+  overrides: MenuItemOverrides; // per-location field overrides
+}
+
+export function resolveField(
+  item: MenuItem,
+  location: LocationCode,
+  field: keyof MenuItemFields,
+): string {
+  return item.overrides[location]?.[field] ?? item.fields[field];
+}
+
+export function resolveRelatedIds(item: MenuItem, location: LocationCode): string[] {
+  return item.overrides[location]?.relatedIds ?? item.relatedIds;
+}
+
+// ── Category (DB-managed ordering) ──────────────────────────────────────────
+
+export interface Category {
+  id: string;
+  name: string;
+  sortOrder: number;
 }
 
 // ── Filter state ────────────────────────────────────────────────────────────

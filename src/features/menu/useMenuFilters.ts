@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react';
 import type { MenuItem, MenuFilters, LocationCode } from '../../types/menu';
-import { EATERY_LOCATIONS } from '../../types/menu';
 import { isAvailableAt } from '../../utils/locationParser';
 
-export function useMenuFilters(items: MenuItem[] | undefined, location: LocationCode) {
+export function useMenuFilters(
+  items: MenuItem[] | undefined,
+  location: LocationCode,
+  categoryOrder?: string[],
+) {
   const [filters, setFilters] = useState<MenuFilters>({
     search: '',
     category: '',
@@ -12,8 +15,19 @@ export function useMenuFilters(items: MenuItem[] | undefined, location: Location
 
   const categories = useMemo(() => {
     if (!items) return [];
-    return [...new Set(items.map((i) => i.category).filter(Boolean))].sort();
-  }, [items]);
+    const unique = [...new Set(items.map((i) => i.category).filter(Boolean))];
+    if (categoryOrder && categoryOrder.length > 0) {
+      return unique.sort((a, b) => {
+        const ai = categoryOrder.indexOf(a);
+        const bi = categoryOrder.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    }
+    return unique.sort();
+  }, [items, categoryOrder]);
 
   const subCategories = useMemo(() => {
     if (!items) return [];
@@ -43,24 +57,23 @@ export function useMenuFilters(items: MenuItem[] | undefined, location: Location
       );
     }
 
-    return result;
-  }, [items, location, filters]);
+    if (categoryOrder && categoryOrder.length > 0) {
+      result = [...result].sort((a, b) => {
+        const ai = categoryOrder.indexOf(a.category);
+        const bi = categoryOrder.indexOf(b.category);
+        const ao = ai === -1 ? Infinity : ai;
+        const bo = bi === -1 ? Infinity : bi;
+        if (ao !== bo) return ao - bo;
+        return a.name.localeCompare(b.name);
+      });
+    }
 
-  const setSearch = (search: string) => setFilters((f) => ({ ...f, search }));
-  const setCategory = (category: string) =>
-    setFilters((f) => ({ ...f, category, subCategory: '' }));
+    return result;
+  }, [items, location, filters, categoryOrder]);
+
+  const setSearch      = (search: string)      => setFilters((f) => ({ ...f, search }));
+  const setCategory    = (category: string)    => setFilters((f) => ({ ...f, category, subCategory: '' }));
   const setSubCategory = (subCategory: string) => setFilters((f) => ({ ...f, subCategory }));
 
-  const isEatery = EATERY_LOCATIONS.includes(location as 'VD' | 'NW');
-
-  return {
-    filters,
-    filtered,
-    categories,
-    subCategories,
-    setSearch,
-    setCategory,
-    setSubCategory,
-    isEatery,
-  };
+  return { filters, filtered, categories, subCategories, setSearch, setCategory, setSubCategory };
 }

@@ -7,6 +7,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LocationCode } from '../types/menu';
 import { ALL_LOCATIONS, LOCATION_NAMES } from '../types/menu';
+import { useAuth } from '../features/auth/AuthContext';
 import { C, FONT } from '../constants/theme';
 
 const STORAGE_KEY = 'selected_location';
@@ -44,10 +45,15 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, loc).catch(() => undefined);
   }, []);
 
-  // Block render until AsyncStorage has been checked
+  const { session } = useAuth();
+
   if (!isLoaded) return null;
 
-  // First-open: location picker modal (no dismiss, must choose)
+  // Don't block with the location prompt until the user is signed in
+  if (location === null && !session) {
+    return <>{children}</>;
+  }
+
   if (location === null) {
     return (
       <Animated.View style={[styles.firstRunWrap, { opacity: fadeAnim }]}>
@@ -63,7 +69,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
                 accessibilityRole="button"
                 accessibilityLabel={LOCATION_NAMES[loc]}
               >
-                <Text style={styles.firstRunCode}>{loc}</Text>
                 <Text style={styles.firstRunName}>{LOCATION_NAMES[loc]}</Text>
               </TouchableOpacity>
             ))}
@@ -86,54 +91,11 @@ export function useLocation(): LocationContextValue {
   return ctx;
 }
 
-// ── Location picker modal (used from the header button) ──────────────────────
-
-interface LocationPickerModalProps {
-  visible: boolean;
-  current: LocationCode;
-  onSelect: (loc: LocationCode) => void;
-  onClose: () => void;
-}
-
-export function LocationPickerModal({ visible, current, onSelect, onClose }: LocationPickerModalProps) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Switch Location</Text>
-          {ALL_LOCATIONS.map((loc) => (
-            <TouchableOpacity
-              key={loc}
-              style={[styles.modalOption, loc === current && styles.modalOptionActive]}
-              onPress={() => { onSelect(loc); onClose(); }}
-              accessibilityRole="button"
-            >
-              <View style={styles.modalOptionLeft}>
-                <Text style={[styles.modalOptionCode, loc === current && styles.modalOptionCodeActive]}>
-                  {loc}
-                </Text>
-                <Text style={[styles.modalOptionName, loc === current && styles.modalOptionNameActive]}>
-                  {LOCATION_NAMES[loc]}
-                </Text>
-              </View>
-              {loc === current && <Text style={styles.modalCheck}>✓</Text>}
-            </TouchableOpacity>
-          ))}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
-
-// ── Header button ─────────────────────────────────────────────────────────────
+// ── Header button + picker modal ──────────────────────────────────────────────
 
 export function LocationHeaderButton() {
   const { location, setLocation } = useLocation();
+  const { signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -144,16 +106,46 @@ export function LocationHeaderButton() {
         accessibilityRole="button"
         accessibilityLabel={`Current location: ${LOCATION_NAMES[location]}. Tap to change.`}
       >
-        <Text style={styles.headerBtnCode}>{location}</Text>
+        <Text style={styles.headerBtnName}>{LOCATION_NAMES[location]}</Text>
         <Text style={styles.headerBtnChevron}>▾</Text>
       </TouchableOpacity>
 
-      <LocationPickerModal
+      <Modal
         visible={open}
-        current={location}
-        onSelect={setLocation}
-        onClose={() => setOpen(false)}
-      />
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setOpen(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Location</Text>
+
+            {ALL_LOCATIONS.map((loc) => (
+              <TouchableOpacity
+                key={loc}
+                style={[styles.modalOption, loc === location && styles.modalOptionActive]}
+                onPress={() => { setLocation(loc); setOpen(false); }}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.modalOptionName, loc === location && styles.modalOptionNameActive]}>
+                  {LOCATION_NAMES[loc]}
+                </Text>
+                {loc === location && <Text style={styles.modalCheck}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={styles.signOutBtn}
+              onPress={() => { setOpen(false); void signOut(); }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </>
   );
 }
@@ -193,21 +185,12 @@ const styles = StyleSheet.create({
   },
   firstRunOptions: { gap: 10 },
   firstRunOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
     backgroundColor: C.bg,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 14,
     padding: 16,
-  },
-  firstRunCode: {
-    fontSize: 13,
-    fontFamily: FONT.bold,
-    color: C.primary,
-    width: 32,
-    textAlign: 'center',
+    alignItems: 'center',
   },
   firstRunName: {
     fontSize: 15,
@@ -254,15 +237,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderBright,
   },
-  modalOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  modalOptionCode: {
-    fontSize: 12,
-    fontFamily: FONT.bold,
-    color: C.textMuted,
-    width: 30,
-    textAlign: 'center',
-  },
-  modalOptionCodeActive: { color: C.primary },
   modalOptionName: {
     fontSize: 15,
     fontFamily: FONT.semiBold,
@@ -271,10 +245,27 @@ const styles = StyleSheet.create({
   modalOptionNameActive: { color: C.primary },
   modalCheck: { fontSize: 14, color: C.primary, fontFamily: FONT.bold },
 
+  divider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginVertical: 12,
+  },
+  signOutBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  signOutText: {
+    fontSize: 15,
+    fontFamily: FONT.semiBold,
+    color: C.textSub,
+  },
+
   headerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -283,9 +274,9 @@ const styles = StyleSheet.create({
     backgroundColor: C.primaryMuted,
     marginRight: 12,
   },
-  headerBtnCode: {
+  headerBtnName: {
     fontSize: 13,
-    fontFamily: FONT.bold,
+    fontFamily: FONT.semiBold,
     color: C.primary,
   },
   headerBtnChevron: {

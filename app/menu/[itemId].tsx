@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, Redirect } from 'expo-router';
 import { useMenuItems } from '../../src/services/menuService';
-import { useLocation } from '../../src/contexts/LocationContext';
+import { useLocation, LocationHeaderButton } from '../../src/contexts/LocationContext';
+import { useAuth } from '../../src/features/auth/AuthContext';
 import { MenuItemDetailScreen } from '../../src/features/menu/MenuItemDetailScreen';
 import { LoadingState } from '../../src/components/ui/LoadingState';
 import { ErrorState } from '../../src/components/ui/ErrorState';
@@ -10,9 +11,11 @@ import { C, FONT } from '../../src/constants/theme';
 
 export default function MenuItemPage() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { session } = useAuth();
   const { data: items, isLoading, isError, error, refetch } = useMenuItems();
   const { location } = useLocation();
 
+  if (!session) return <Redirect href="/(auth)/login" />;
   if (isLoading) return <LoadingState message="Loading…" />;
   if (isError)
     return <ErrorState message={(error as Error).message} onRetry={() => void refetch()} />;
@@ -30,7 +33,7 @@ export default function MenuItemPage() {
 
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ title: item.name }} />
+      <Stack.Screen options={{ title: item.name, headerRight: () => <LocationHeaderButton /> }} />
       <MenuItemDetailScreen item={item} selectedLocation={location} allItems={items ?? []} />
     </View>
   );

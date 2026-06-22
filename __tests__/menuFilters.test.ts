@@ -2,10 +2,10 @@ import { renderHook, act } from '@testing-library/react-native';
 import { useMenuFilters } from '../src/features/menu/useMenuFilters';
 import type { MenuItem } from '../src/types/menu';
 
-const makeItem = (partial: Omit<MenuItem, 'photos' | 'eatery' | 'restaurant'> & Partial<Pick<MenuItem, 'eatery' | 'restaurant'>>): MenuItem => ({
+const makeItem = (partial: Omit<MenuItem, 'photos' | 'fields' | 'overrides'> & Partial<Pick<MenuItem, 'fields' | 'overrides'>>): MenuItem => ({
   photos: [],
-  eatery: { ingredients: '', description: '', presentation: '', takeout: '', facts: '' },
-  restaurant: { ingredients: '', description: '', presentation: '', takeout: '', facts: '' },
+  fields: { ingredients: '', description: '', presentation: '', takeout: '', facts: '', upsell: '' },
+  overrides: {},
   ...partial,
 });
 
@@ -14,15 +14,15 @@ const ITEMS: MenuItem[] = [
     id: '1', csvId: 'borscht', relatedIds: [],
     name: 'Borscht', category: 'Soup', subCategory: 'Hot',
     locations: ['GT', 'NW'], imageUrl: null,
-    eatery:     { ingredients: 'beets',          description: 'red soup',       presentation: '', takeout: '', facts: '' },
-    restaurant: { ingredients: 'beets, cream',   description: 'refined borscht', presentation: '', takeout: '', facts: '' },
+    fields: { ingredients: 'beets', description: 'red soup', presentation: '', takeout: '', facts: '', upsell: '' },
+    overrides: { LG: { ingredients: 'beets, cream', description: 'refined borscht' }, GT: { ingredients: 'beets, cream', description: 'refined borscht' }, NT: { ingredients: 'beets, cream', description: 'refined borscht' } },
   }),
   makeItem({
     id: '2', csvId: 'caesar', relatedIds: [],
     name: 'Caesar Salad', category: 'Salad', subCategory: 'Cold',
     locations: ['LG', 'GT'], imageUrl: null,
-    eatery:     { ingredients: 'romaine',          description: 'classic caesar',  presentation: '', takeout: '', facts: '' },
-    restaurant: { ingredients: 'romaine, anchovies', description: 'elevated caesar', presentation: '', takeout: '', facts: '' },
+    fields: { ingredients: 'romaine', description: 'classic caesar', presentation: '', takeout: '', facts: '', upsell: '' },
+    overrides: { LG: { ingredients: 'romaine, anchovies', description: 'elevated caesar' }, GT: { ingredients: 'romaine, anchovies', description: 'elevated caesar' }, NT: { ingredients: 'romaine, anchovies', description: 'elevated caesar' } },
   }),
   makeItem({
     id: '3', csvId: 'pelmeni', relatedIds: [],
@@ -70,15 +70,5 @@ describe('useMenuFilters', () => {
   it('builds category list from items', () => {
     const { result } = renderHook(() => useMenuFilters(ITEMS, 'GT'));
     expect(result.current.categories).toEqual(['Mains', 'Salad', 'Soup']);
-  });
-
-  it('marks GT as non-eatery', () => {
-    const { result } = renderHook(() => useMenuFilters(ITEMS, 'GT'));
-    expect(result.current.isEatery).toBe(false);
-  });
-
-  it('marks NW as eatery', () => {
-    const { result } = renderHook(() => useMenuFilters(ITEMS, 'NW'));
-    expect(result.current.isEatery).toBe(true);
   });
 });
