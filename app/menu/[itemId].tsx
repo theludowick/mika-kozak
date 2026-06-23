@@ -10,7 +10,7 @@ import { ErrorState } from '../../src/components/ui/ErrorState';
 import { C, FONT } from '../../src/constants/theme';
 
 export default function MenuItemPage() {
-  const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { itemId, edit } = useLocalSearchParams<{ itemId: string; edit?: string }>();
   const { session } = useAuth();
   const { data: items, isLoading, isError, error, refetch } = useMenuItems();
   const { location } = useLocation();
@@ -34,7 +34,7 @@ export default function MenuItemPage() {
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ title: item.name, headerRight: () => <LocationHeaderButton /> }} />
-      <MenuItemDetailScreen item={item} selectedLocation={location} allItems={items ?? []} />
+      <MenuItemDetailScreen item={item} selectedLocation={location} allItems={items ?? []} autoEdit={edit === '1'} />
     </View>
   );
 }

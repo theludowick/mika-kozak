@@ -13,6 +13,7 @@ interface MenuItemDetailScreenProps {
   item: MenuItem;
   selectedLocation: LocationCode;
   allItems: MenuItem[];
+  autoEdit?: boolean;
 }
 
 interface Section {
@@ -31,10 +32,10 @@ function getSections(item: MenuItem, location: LocationCode): Section[] {
   ].filter((s) => s.value.trim() !== '');
 }
 
-export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuItemDetailScreenProps) {
+export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdit }: MenuItemDetailScreenProps) {
   const router = useRouter();
   const { isAdmin } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(autoEdit ?? false);
 
   // Admin edit mode — full-screen panel
   if (isEditing && isAdmin) {
@@ -59,7 +60,7 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems }: MenuI
   return (
     <View style={styles.root}>
       {/* Restore default header when not in edit mode */}
-      <Stack.Screen options={{ headerLeft: undefined, gestureEnabled: true }} />
+      <Stack.Screen options={{ headerLeft: undefined, headerTitle: '', gestureEnabled: true }} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.carouselWrap}>

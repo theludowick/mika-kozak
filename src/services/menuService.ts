@@ -9,10 +9,11 @@ async function fetchMenuItems(): Promise<MenuItem[]> {
     .from('menu_items')
     .select(`
       id, csv_id, name, category, sub_category, locations, image_url, related_csv_ids,
-      ingredients, description, presentation, takeout, facts, upsell, overrides,
+      ingredients, description, presentation, takeout, facts, upsell, overrides, sort_order,
       menu_item_photos (id, image_url, locations, note, sort_order)
     `)
     .order('category')
+    .order('sort_order')
     .order('name');
 
   if (error) throw new Error(error.message);
@@ -98,6 +99,51 @@ export async function updateMenuItem(
     })
     .eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+export async function createMenuItem(item: {
+  name: string;
+  category: string;
+  subCategory: string;
+  locations: LocationCode[];
+  ingredients: string;
+  description: string;
+  presentation: string;
+  takeout: string;
+  facts: string;
+  upsell: string;
+  sortOrder: number;
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('menu_items')
+    .insert({
+      name:          item.name,
+      category:      item.category,
+      sub_category:  item.subCategory,
+      locations:     item.locations,
+      ingredients:   item.ingredients,
+      description:   item.description,
+      presentation:  item.presentation,
+      takeout:       item.takeout,
+      facts:         item.facts,
+      upsell:        item.upsell,
+      sort_order:    item.sortOrder,
+      overrides:     {},
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id as string;
+}
+
+export async function reorderMenuItems(orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, i) =>
+      supabase.from('menu_items').update({ sort_order: i }).eq('id', id),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
 }
 
 export async function bulkMoveCategory(ids: string[], category: string): Promise<void> {

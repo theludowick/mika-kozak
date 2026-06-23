@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, FlatList, TouchableOpacity,
-  Alert, StyleSheet, Platform, ActivityIndicator,
+  Alert, Modal, StyleSheet, Platform, ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
@@ -238,18 +238,12 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   }, [name, category, subCategory, fields, overrides, itemLocations, relatedIds, item.id, onSave, queryClient]);
 
   // ── Cancel ────────────────────────────────────────────────────────────────
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+
   const handleRequestCancel = useCallback(() => {
     if (!hasUnsavedChanges()) { onCancel(); return; }
-    if (Platform.OS === 'web') {
-      if ((window as Window & typeof globalThis).confirm('Discard unsaved changes?')) onCancel();
-      return;
-    }
-    Alert.alert('Unsaved Changes', 'You have unsaved edits.', [
-      { text: 'Save',         onPress: () => void handleSave() },
-      { text: 'Discard',      style: 'destructive', onPress: onCancel },
-      { text: 'Keep Editing', style: 'cancel' },
-    ]);
-  }, [hasUnsavedChanges, handleSave, onCancel]);
+    setShowUnsavedModal(true);
+  }, [hasUnsavedChanges, onCancel]);
 
   const requestCancelRef = useRef(handleRequestCancel);
   requestCancelRef.current = handleRequestCancel;
@@ -340,7 +334,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
     const { Image } = require('react-native') as typeof import('react-native');
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => setPendingUri(null)} />, gestureEnabled: false }} />
+        <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => setPendingUri(null)} />, headerRight: () => null, gestureEnabled: false }} />
         <Text style={styles.sectionHeader}>Assign Photo to Locations</Text>
         <View style={styles.carouselWrap}>
           <View style={styles.previewWrap}>
@@ -376,7 +370,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   if (editingPhoto) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => setEditingPhoto(null)} />, gestureEnabled: false }} />
+        <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => setEditingPhoto(null)} />, headerRight: () => null, gestureEnabled: false }} />
         <Text style={styles.sectionHeader}>Edit Photo</Text>
         <View style={styles.carouselWrap}>
           <PhotoCarousel photos={[editingPhoto]} fallbackUrl={null} location={selectedLocation} />
@@ -431,6 +425,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
       <View style={{ flex: 1 }}>
         <Stack.Screen options={{
           headerLeft: () => <XButton onPress={() => { setRelatedItemsOpen(false); setRelatedSearch(''); }} />,
+          headerRight: () => null,
           gestureEnabled: false,
         }} />
         <View style={styles.relatedHeader}>
@@ -488,7 +483,22 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   // ── Main edit panel ───────────────────────────────────────────────────────
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => requestCancelRef.current()} />, gestureEnabled: false }} />
+      <Stack.Screen options={{
+        headerLeft: () => <XButton onPress={() => requestCancelRef.current()} />,
+        headerTitle: '',
+        headerRight: () => (
+          <TouchableOpacity
+            style={[headerStyles.saveBtn, saving && headerStyles.saveBtnDisabled]}
+            onPress={() => void handleSave()}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator color={C.primary} size="small" />
+              : <Text style={headerStyles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
+        ),
+        gestureEnabled: false,
+      }} />
 
       {/* 1. Photos — first block */}
       <Text style={styles.sectionHeader}>Photos</Text>
@@ -619,21 +629,23 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
         <Text style={styles.addPhotoBtnText}>Browse & Connect Items</Text>
       </TouchableOpacity>
 
-      <View style={styles.divider} />
-
-      {/* Save / Cancel */}
-      <View style={styles.actionRow}>
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.btnDisabled]}
-          onPress={() => void handleSave()}
-          disabled={saving}
-        >
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.cancelBtn} onPress={handleRequestCancel} disabled={saving}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
+      <Modal visible={showUnsavedModal} transparent animationType="fade" onRequestClose={() => setShowUnsavedModal(false)}>
+        <View style={styles.overlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Unsaved changes</Text>
+            <Text style={styles.confirmBody}>What would you like to do with your edits?</Text>
+            <TouchableOpacity style={styles.confirmBtnSave} onPress={() => { setShowUnsavedModal(false); void handleSave(); }}>
+              <Text style={styles.confirmBtnSaveText}>Save Changes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtnDiscard} onPress={() => { setShowUnsavedModal(false); onCancel(); }}>
+              <Text style={styles.confirmBtnDiscardText}>Discard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmBtnKeep} onPress={() => setShowUnsavedModal(false)}>
+              <Text style={styles.confirmBtnKeepText}>Keep Editing</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -644,6 +656,12 @@ const headerStyles = StyleSheet.create({
     backgroundColor: C.surfaceHigh, alignItems: 'center', justifyContent: 'center',
   },
   closeIcon: { fontSize: 14, color: C.textSub, fontFamily: FONT.semiBold },
+  saveBtn: {
+    marginRight: 12, paddingHorizontal: 18, paddingVertical: 8,
+    borderRadius: 10, backgroundColor: C.primary,
+  },
+  saveBtnText:     { fontSize: 14, color: '#fff', fontFamily: FONT.semiBold },
+  saveBtnDisabled: { opacity: 0.45 },
 });
 
 const styles = StyleSheet.create({
@@ -710,4 +728,21 @@ const styles = StyleSheet.create({
   cancelBtn:    { paddingHorizontal: 20, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   cancelBtnText:{ color: C.textSub, fontSize: 15, fontFamily: FONT.medium },
   btnDisabled:  { opacity: 0.45 },
+
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center', padding: 32,
+  },
+  confirmCard: {
+    backgroundColor: C.surface, borderRadius: 20, padding: 24,
+    width: '100%', maxWidth: 340, borderWidth: 1, borderColor: C.border, gap: 10,
+  },
+  confirmTitle:           { fontSize: 18, fontFamily: FONT.semiBold, color: C.text, marginBottom: 2 },
+  confirmBody:            { fontSize: 14, color: C.textSub, fontFamily: FONT.regular, lineHeight: 20, marginBottom: 6 },
+  confirmBtnSave:         { paddingVertical: 13, borderRadius: 12, backgroundColor: C.primary, alignItems: 'center' },
+  confirmBtnSaveText:     { color: '#fff', fontSize: 15, fontFamily: FONT.semiBold },
+  confirmBtnDiscard:      { paddingVertical: 13, borderRadius: 12, backgroundColor: C.error, alignItems: 'center' },
+  confirmBtnDiscardText:  { color: '#fff', fontSize: 15, fontFamily: FONT.semiBold },
+  confirmBtnKeep:         { paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
+  confirmBtnKeepText:     { color: C.textSub, fontSize: 15, fontFamily: FONT.medium },
 });

@@ -17,9 +17,8 @@ import type { MenuItem } from '../../types/menu';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { CategoryEditModal } from './components/CategoryEditModal';
-import { SubCategoryEditModal } from './components/SubCategoryEditModal';
 import { BulkActionBar } from './components/BulkActionBar';
+import { ItemFormModal } from './components/ItemFormModal';
 import { C, FONT } from '../../constants/theme';
 
 type ViewMode = 'grid' | 'list';
@@ -91,11 +90,10 @@ export function MenuListScreen() {
   const { data: items,      isLoading,  isError,   error,  refetch, isFetching } = useMenuItems();
   const { data: categories, isLoading: catLoading, isError: catError } = useCategories();
 
-  const [viewMode,          setViewMode]          = useState<ViewMode>('grid');
-  const [showFilters,       setShowFilters]       = useState(false);
-  const [categoryEditOpen,    setCategoryEditOpen]    = useState(false);
-  const [subCategoryEditOpen, setSubCategoryEditOpen] = useState(false);
-  const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
+  const [viewMode,    setViewMode]    = useState<ViewMode>('grid');
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const isSelecting = selectedIds.size > 0;
 
   const categoryOrder = useMemo(
@@ -199,14 +197,9 @@ export function MenuListScreen() {
         </Text>
         <View style={styles.viewToggle}>
           {isAdmin && (
-            <>
-              <TouchableOpacity style={styles.editCatBtn} onPress={() => setCategoryEditOpen(true)}>
-                <Text style={styles.editCatBtnText}>Categories</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.editCatBtn} onPress={() => setSubCategoryEditOpen(true)}>
-                <Text style={styles.editCatBtnText}>Sub-cats</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity style={styles.editCatBtn} onPress={() => setShowAddItem(true)}>
+              <Text style={styles.editCatBtnText}>+ Add Item</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity
             style={[styles.viewBtn, viewMode === 'grid' && styles.viewBtnActive]}
@@ -287,22 +280,11 @@ export function MenuListScreen() {
         />
       )}
 
-      {/* Category edit modal */}
-      <CategoryEditModal
-        visible={categoryEditOpen}
+      <ItemFormModal
+        visible={showAddItem}
         categories={categories ?? []}
         items={items ?? []}
-        isLoading={catLoading}
-        isError={catError}
-        onClose={() => setCategoryEditOpen(false)}
-      />
-
-      {/* Sub-category edit modal */}
-      <SubCategoryEditModal
-        visible={subCategoryEditOpen}
-        categories={categories ?? []}
-        items={items ?? []}
-        onClose={() => setSubCategoryEditOpen(false)}
+        onClose={() => setShowAddItem(false)}
       />
     </View>
   );
@@ -417,8 +399,13 @@ function ListCard({
       </View>
       <View style={styles.listBody}>
         <Text style={styles.listName}>{item.name}</Text>
-        {item.category    ? <Text style={styles.listMeta}>{item.category}</Text>   : null}
-        {item.subCategory ? <Text style={styles.listSub}>{item.subCategory}</Text> : null}
+        {(item.category || item.subCategory) ? (
+          <View style={styles.listBreadcrumb}>
+            {item.category    ? <Text style={styles.listBreadcrumbCat}>{item.category}</Text> : null}
+            {item.category && item.subCategory ? <Text style={styles.listBreadcrumbSep}> › </Text> : null}
+            {item.subCategory ? <Text style={styles.listBreadcrumbSub}>{item.subCategory}</Text> : null}
+          </View>
+        ) : null}
       </View>
       <Text style={styles.listArrow}>›</Text>
     </TouchableOpacity>
@@ -513,12 +500,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: C.border, borderRadius: 14, marginBottom: 10, overflow: 'hidden',
   },
   listImageWrap: { position: 'relative' },
-  listImage:     { width: 76, height: 76 },
-  listBody:      { flex: 1, paddingHorizontal: 14, paddingVertical: 12, gap: 3 },
-  listName:      { fontSize: 15, color: C.text,     fontFamily: FONT.semiBold },
-  listMeta:      { fontSize: 12, color: C.primary,  fontFamily: FONT.medium },
-  listSub:       { fontSize: 11, color: C.textMuted, fontFamily: FONT.regular },
-  listArrow:     { fontSize: 20, color: C.textMuted, paddingRight: 14 },
+  listImage:     { width: 58, height: 58 },
+  listBody:      { flex: 1, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
+  listName:          { fontSize: 15, color: C.text, fontFamily: FONT.semiBold },
+  listBreadcrumb:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  listBreadcrumbCat: { fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: C.primary, fontFamily: FONT.semiBold },
+  listBreadcrumbSep: { fontSize: 9, color: C.textMuted, fontFamily: FONT.regular },
+  listBreadcrumbSub: { fontSize: 9, color: C.textMuted, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 1 },
+  listArrow:         { fontSize: 20, color: C.textMuted, paddingRight: 14 },
 
   cardSelected:  { borderColor: C.primary, backgroundColor: C.primaryMuted },
   checkOverlay: {

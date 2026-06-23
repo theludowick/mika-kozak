@@ -95,7 +95,6 @@ export function useLocation(): LocationContextValue {
 
 export function LocationHeaderButton() {
   const { location, setLocation } = useLocation();
-  const { signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -134,15 +133,6 @@ export function LocationHeaderButton() {
               </TouchableOpacity>
             ))}
 
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.signOutBtn}
-              onPress={() => { setOpen(false); void signOut(); }}
-              accessibilityRole="button"
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -244,23 +234,6 @@ const styles = StyleSheet.create({
   },
   modalOptionNameActive: { color: C.primary },
   modalCheck: { fontSize: 14, color: C.primary, fontFamily: FONT.bold },
-
-  divider: {
-    height: 1,
-    backgroundColor: C.border,
-    marginVertical: 12,
-  },
-  signOutBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  signOutText: {
-    fontSize: 15,
-    fontFamily: FONT.semiBold,
-    color: C.textSub,
-  },
 
   headerBtn: {
     flexDirection: 'row',

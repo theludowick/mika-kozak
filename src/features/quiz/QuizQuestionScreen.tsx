@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Platform,
+  Modal,
   StyleSheet,
 } from 'react-native';
 import type { ParsedQuestion, MultipleChoiceQuestion, OpenAnswerQuestion, AnswerState } from '../../types/quiz';
@@ -225,17 +225,7 @@ export function QuizQuestionScreen({
   onPrev,
   onExit,
 }: QuizQuestionScreenProps) {
-  const handleExit = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Leave quiz? Your progress will be saved.')) onExit();
-    } else {
-      const { Alert } = require('react-native') as typeof import('react-native');
-      Alert.alert('Leave quiz?', 'Your progress will be saved.', [
-        { text: 'Keep going', style: 'cancel' },
-        { text: 'Leave', style: 'destructive', onPress: onExit },
-      ]);
-    }
-  };
+  const [showExitModal, setShowExitModal] = useState(false);
 
   const pctCorrect = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : null;
 
@@ -251,7 +241,7 @@ export function QuizQuestionScreen({
         </View>
         <View style={styles.headerRight}>
           <Text style={styles.questionCounter}>{questionNumber} / {totalQuestions}</Text>
-          <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
+          <TouchableOpacity onPress={() => setShowExitModal(true)} style={styles.exitBtn}>
             <Text style={styles.exitBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -312,6 +302,23 @@ export function QuizQuestionScreen({
           <Text style={styles.prevBtnText}>← Previous</Text>
         </TouchableOpacity>
       )}
+
+      <Modal visible={showExitModal} transparent animationType="fade" onRequestClose={() => setShowExitModal(false)}>
+        <View style={styles.overlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Leave quiz?</Text>
+            <Text style={styles.confirmBody}>Your progress will be saved.</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.confirmBtnKeep} onPress={() => setShowExitModal(false)}>
+                <Text style={styles.confirmBtnKeepText}>Keep going</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmBtnLeave} onPress={() => { setShowExitModal(false); onExit(); }}>
+                <Text style={styles.confirmBtnLeaveText}>Leave</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -531,4 +538,20 @@ const styles = StyleSheet.create({
 
   prevBtn:     { paddingVertical: 12, alignItems: 'center' },
   prevBtnText: { color: C.textMuted, fontSize: 13, fontFamily: FONT.medium },
+
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center', padding: 32,
+  },
+  confirmCard: {
+    backgroundColor: C.surface, borderRadius: 20, padding: 24,
+    width: '100%', maxWidth: 340, borderWidth: 1, borderColor: C.border,
+  },
+  confirmTitle:        { fontSize: 18, fontFamily: FONT.semiBold, color: C.text, marginBottom: 8 },
+  confirmBody:         { fontSize: 14, color: C.textSub, fontFamily: FONT.regular, marginBottom: 24, lineHeight: 20 },
+  confirmBtns:         { flexDirection: 'row', gap: 10 },
+  confirmBtnKeep:      { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
+  confirmBtnKeepText:  { color: C.textSub, fontSize: 15, fontFamily: FONT.medium },
+  confirmBtnLeave:     { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: C.error, alignItems: 'center' },
+  confirmBtnLeaveText: { color: '#fff', fontSize: 15, fontFamily: FONT.semiBold },
 });
