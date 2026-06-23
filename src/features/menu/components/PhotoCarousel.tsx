@@ -21,6 +21,7 @@ interface PhotoCarouselProps {
   fallbackUrl: string | null;
   location: LocationCode;
   isEditMode?: boolean;
+  forceShowAll?: boolean;
   deletingPhotoId?: string | null;
   onDeletePhoto?: (photo: MenuItemPhoto) => void;
   onEditPhoto?: (photo: MenuItemPhoto) => void;
@@ -31,6 +32,7 @@ export function PhotoCarousel({
   fallbackUrl,
   location,
   isEditMode = false,
+  forceShowAll = false,
   deletingPhotoId,
   onDeletePhoto,
   onEditPhoto,
@@ -42,14 +44,14 @@ export function PhotoCarousel({
   const pageRef = useRef(0);
 
   // Edit mode shows all photos; view mode filters to the active location
-  const visiblePhotos = isEditMode
+  const visiblePhotos = (isEditMode || forceShowAll)
     ? photos
     : photos.filter((p) => p.locations.includes(location));
 
   const isFallback = visiblePhotos.length === 0;
 
   const slides: Slide[] = isFallback
-    ? [{ id: '_fallback', imageUrl: fallbackUrl, isFallback: true }]
+    ? [{ id: '_fallback', imageUrl: isEditMode ? fallbackUrl : null, isFallback: true }]
     : visiblePhotos.map((p) => ({
         id: p.id,
         imageUrl: p.imageUrl,
@@ -150,7 +152,7 @@ const styles = StyleSheet.create({
   root: { marginBottom: 12, width: '100%' },
   scrollView: { borderRadius: 16, overflow: 'hidden', width: '100%' },
   slide: { aspectRatio: 4 / 3, overflow: 'hidden' },
-  placeholder: { flex: 1, backgroundColor: C.surfaceHigh },
+  placeholder: { flex: 1, backgroundColor: C.surfaceHigh, aspectRatio: 4 / 3 },
 
   editOverlay: {
     position: 'absolute', bottom: 10, right: 10,

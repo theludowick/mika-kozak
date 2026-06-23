@@ -233,6 +233,7 @@ export function MenuListScreen() {
                 items={row.items}
                 cols={row.cols}
                 itemWidth={gridItemWidth}
+                location={location}
                 isAdmin={isAdmin}
                 selectedIds={selectedIds}
                 onPress={(item) => {
@@ -246,6 +247,7 @@ export function MenuListScreen() {
           return (
             <ListCard
               item={row.item}
+              location={location}
               isAdmin={isAdmin}
               selected={selectedIds.has(row.item.id)}
               onPress={() => {
@@ -290,6 +292,12 @@ export function MenuListScreen() {
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function locationPhoto(item: MenuItem, location: string): string | null {
+  return item.photos?.find((p) => p.locations.includes(location as import('../../types/menu').LocationCode))?.imageUrl ?? null;
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Chip({ label, active, onPress, variant }: { label: string; active: boolean; onPress: () => void; variant: 'primary' | 'accent' }) {
@@ -317,11 +325,12 @@ function CategoryHeader({ label }: { label: string }) {
 }
 
 function GridRow({
-  items, cols, itemWidth, isAdmin, selectedIds, onPress, onLongPress,
+  items, cols, itemWidth, location, isAdmin, selectedIds, onPress, onLongPress,
 }: {
   items: MenuItem[];
   cols: number;
   itemWidth: number;
+  location: string;
   isAdmin: boolean;
   selectedIds: Set<string>;
   onPress: (item: MenuItem) => void;
@@ -345,8 +354,8 @@ function GridRow({
                 <Text style={styles.checkMark}>✓</Text>
               </View>
             )}
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.gridImage} contentFit="cover" transition={200} />
+            {locationPhoto(item, location) ? (
+              <Image source={{ uri: locationPhoto(item, location)! }} style={styles.gridImage} contentFit="cover" transition={200} />
             ) : (
               <View style={[styles.gridImage, styles.imagePlaceholder]} />
             )}
@@ -369,9 +378,10 @@ function GridRow({
 }
 
 function ListCard({
-  item, isAdmin, selected, onPress, onLongPress,
+  item, location, isAdmin, selected, onPress, onLongPress,
 }: {
   item: MenuItem;
+  location: string;
   isAdmin: boolean;
   selected: boolean;
   onPress: () => void;
@@ -386,8 +396,8 @@ function ListCard({
       accessibilityLabel={`View ${item.name}`}
     >
       <View style={styles.listImageWrap}>
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.listImage} contentFit="cover" transition={200} />
+        {locationPhoto(item, location) ? (
+          <Image source={{ uri: locationPhoto(item, location)! }} style={styles.listImage} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.listImage, styles.imagePlaceholder]} />
         )}

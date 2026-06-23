@@ -9,6 +9,9 @@ import { useAuth } from '../auth/AuthContext';
 import { useMenuItems } from '../../services/menuService';
 import { useCategories } from '../../services/categoryService';
 import { CategoryEditModal } from '../menu/components/CategoryEditModal';
+import { PositionSettingsModal } from './PositionSettingsModal';
+import { ReportedIssuesModal } from './ReportedIssuesModal';
+import { useUnresolvedIssueCount } from '../../services/reportedIssuesService';
 import { C, FONT } from '../../constants/theme';
 
 interface ProfileScreenProps {
@@ -31,10 +34,17 @@ function SectionHeader({ label }: { label: string }) {
   return <Text style={styles.sectionHeader}>{label}</Text>;
 }
 
-function SettingsRow({ label, onPress, danger = false }: { label: string; onPress: () => void; danger?: boolean }) {
+function SettingsRow({ label, onPress, danger = false, badge }: { label: string; onPress: () => void; danger?: boolean; badge?: number }) {
   return (
     <TouchableOpacity style={styles.settingsRow} onPress={onPress}>
-      <Text style={[styles.settingsRowText, danger && styles.settingsRowDanger]}>{label}</Text>
+      <View style={styles.settingsRowLeft}>
+        {badge != null && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+        <Text style={[styles.settingsRowText, danger && styles.settingsRowDanger]}>{label}</Text>
+      </View>
       <Text style={styles.settingsRowChevron}>›</Text>
     </TouchableOpacity>
   );
@@ -43,6 +53,7 @@ function SettingsRow({ label, onPress, danger = false }: { label: string; onPres
 export function ProfileScreen({ visible, onClose }: ProfileScreenProps) {
   const { user, fullName, isAdmin, signOut, refreshProfile } = useAuth();
   const router = useRouter();
+  const { data: unresolvedCount = 0 } = useUnresolvedIssueCount({ enabled: isAdmin });
 
   // Profile edit state
   const [editingName, setEditingName] = useState(false);
@@ -56,7 +67,9 @@ export function ProfileScreen({ visible, onClose }: ProfileScreenProps) {
   const [confirmPwd, setConfirmPwd]         = useState('');
   const [savingPwd, setSavingPwd]           = useState(false);
 
-  const [showCategories, setShowCategories] = useState(false);
+  const [showCategories, setShowCategories]             = useState(false);
+  const [showPositionSettings, setShowPositionSettings] = useState(false);
+  const [showReportedIssues, setShowReportedIssues]     = useState(false);
 
   const { data: items = [], isLoading: itemsLoading, isError: itemsError } = useMenuItems();
   const { data: categories = [], isLoading: catsLoading, isError: catsError } = useCategories();
@@ -134,6 +147,12 @@ export function ProfileScreen({ visible, onClose }: ProfileScreenProps) {
 
   // ── Navigate to item (closes profile first) ────────────────────────────────
   const handleEditItem = (itemId: string) => {
+    onClose();
+    router.push(`/menu/${itemId}`);
+  };
+
+  const handleGoToItem = (itemId: string) => {
+    setShowReportedIssues(false);
     onClose();
     router.push(`/menu/${itemId}`);
   };
@@ -243,6 +262,16 @@ export function ProfileScreen({ visible, onClose }: ProfileScreenProps) {
                 <View style={styles.card}>
                   <SettingsRow label="Items & Categories Settings" onPress={() => setShowCategories(true)} />
                 </View>
+
+                <SectionHeader label="QUIZ SETTINGS" />
+                <View style={styles.card}>
+                  <SettingsRow label="Position Settings" onPress={() => setShowPositionSettings(true)} />
+                </View>
+
+                <SectionHeader label="REPORTS" />
+                <View style={styles.card}>
+                  <SettingsRow label="Reported Issues" onPress={() => setShowReportedIssues(true)} badge={unresolvedCount} />
+                </View>
               </>
             )}
 
@@ -266,6 +295,15 @@ export function ProfileScreen({ visible, onClose }: ProfileScreenProps) {
         isError={catsError}
         onClose={() => setShowCategories(false)}
         onEditItem={handleEditItem}
+      />
+      <PositionSettingsModal
+        visible={showPositionSettings}
+        onClose={() => setShowPositionSettings(false)}
+      />
+      <ReportedIssuesModal
+        visible={showReportedIssues}
+        onClose={() => setShowReportedIssues(false)}
+        onGoToItem={handleGoToItem}
       />
     </>
   );
@@ -325,9 +363,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 15,
   },
+  settingsRowLeft:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   settingsRowText:    { fontSize: 15, fontFamily: FONT.regular, color: C.text },
   settingsRowDanger:  { color: C.error },
   settingsRowChevron: { fontSize: 18, color: C.textMuted, fontFamily: FONT.regular },
+  badge: {
+    minWidth: 20, height: 20, borderRadius: 10,
+    backgroundColor: C.error, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: { fontSize: 11, fontFamily: FONT.bold, color: '#fff' },
 
   passwordCard: {
     backgroundColor: C.surface, borderRadius: 14,

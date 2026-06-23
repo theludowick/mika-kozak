@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import type { MenuItem, LocationCode } from '../../types/menu';
 import { resolveField, resolveRelatedIds, LOCATION_NAMES } from '../../types/menu';
 import { ImageWithFallback } from '../../components/ui/ImageWithFallback';
 import { PhotoCarousel } from './components/PhotoCarousel';
 import { AdminEditPanel } from './AdminEditPanel';
+import { ReportIssueModal } from './components/ReportIssueModal';
 import { useAuth } from '../auth/AuthContext';
 import { C, FONT } from '../../constants/theme';
 
@@ -19,6 +20,23 @@ interface MenuItemDetailScreenProps {
 interface Section {
   label: string;
   value: string;
+}
+
+function FormattedText({ text, style }: { text: string; style: object }) {
+  const parts = text.split(/(\*[^*]+\*|_[^_]+_)/g);
+  return (
+    <Text style={style}>
+      {parts.map((part, i) => {
+        if (part.length > 2 && part.startsWith('*') && part.endsWith('*')) {
+          return <Text key={i} style={{ fontFamily: FONT.bold }}>{part.slice(1, -1)}</Text>;
+        }
+        if (part.length > 2 && part.startsWith('_') && part.endsWith('_')) {
+          return <Text key={i} style={{ fontStyle: 'italic', color: C.textSub }}>{part.slice(1, -1)}</Text>;
+        }
+        return part;
+      })}
+    </Text>
+  );
 }
 
 function getSections(item: MenuItem, location: LocationCode): Section[] {
@@ -35,7 +53,8 @@ function getSections(item: MenuItem, location: LocationCode): Section[] {
 export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdit }: MenuItemDetailScreenProps) {
   const router = useRouter();
   const { isAdmin } = useAuth();
-  const [isEditing, setIsEditing] = useState(autoEdit ?? false);
+  const [isEditing, setIsEditing]       = useState(autoEdit ?? false);
+  const [showReport, setShowReport]     = useState(false);
 
   // Admin edit mode — full-screen panel
   if (isEditing && isAdmin) {
@@ -86,7 +105,7 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdi
           sections.map((sec) => (
             <View key={sec.label} style={styles.section}>
               <Text style={styles.sectionLabel}>{sec.label}</Text>
-              <Text style={styles.sectionText}>{sec.value}</Text>
+              <FormattedText text={sec.value} style={styles.sectionText} />
             </View>
           ))
         ) : (
@@ -126,9 +145,12 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdi
             ))}
           </View>
         )}
+        <TouchableOpacity style={styles.reportBtn} onPress={() => setShowReport(true)}>
+          <Text style={styles.reportBtnText}>⚑  Report incorrect information</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* Floating edit button — admin only, top-right below header */}
+      {/* Floating edit button — admin only */}
       {isAdmin && (
         <TouchableOpacity
           style={styles.floatingEditBtn}
@@ -139,6 +161,13 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdi
           <Text style={styles.floatingEditIcon}>✎</Text>
         </TouchableOpacity>
       )}
+
+      <ReportIssueModal
+        visible={showReport}
+        itemId={item.id}
+        itemName={item.name}
+        onClose={() => setShowReport(false)}
+      />
     </View>
   );
 }
@@ -246,4 +275,10 @@ const styles = StyleSheet.create({
   relatedName:  { fontSize: 15, color: C.text,    fontFamily: FONT.semiBold },
   relatedSub:   { fontSize: 12, color: C.textSub, fontFamily: FONT.regular, marginTop: 2 },
   relatedArrow: { fontSize: 20, color: C.textMuted },
+
+  reportBtn: {
+    marginTop: 32, paddingVertical: 12, alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: C.border,
+  },
+  reportBtnText: { fontSize: 13, color: C.textMuted, fontFamily: FONT.regular },
 });

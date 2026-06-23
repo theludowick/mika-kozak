@@ -176,9 +176,10 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   const [uploading, setUploading]     = useState(false);
 
   // ── Edit-photo sub-screen ─────────────────────────────────────────────────
-  const [editingPhoto, setEditingPhoto]   = useState<MenuItemPhoto | null>(null);
-  const [editPhotoLocs, setEditPhotoLocs] = useState<LocationCode[]>([]);
-  const [editPhotoNote, setEditPhotoNote] = useState<string>('');
+  const [editingPhoto, setEditingPhoto]     = useState<MenuItemPhoto | null>(null);
+  const [editPhotoLocs, setEditPhotoLocs]   = useState<LocationCode[]>([]);
+  const [editPhotoNote, setEditPhotoNote]   = useState<string>('');
+  const [savingPhotoMeta, setSavingPhotoMeta] = useState(false);
 
   // ── Related items sub-screen ──────────────────────────────────────────────
   const [relatedItemsOpen, setRelatedItemsOpen] = useState(false);
@@ -315,11 +316,13 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
 
   const handleSavePhotoMeta = async () => {
     if (!editingPhoto) return;
+    setSavingPhotoMeta(true);
     try {
       await updatePhotoMeta(editingPhoto.id, editPhotoLocs, editPhotoNote.trim() || null);
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
       setEditingPhoto(null);
     } catch (e) { Alert.alert('Error', (e as Error).message); }
+    finally { setSavingPhotoMeta(false); }
   };
 
   // ── Shared X-button ───────────────────────────────────────────────────────
@@ -373,7 +376,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
         <Stack.Screen options={{ headerLeft: () => <XButton onPress={() => setEditingPhoto(null)} />, headerRight: () => null, gestureEnabled: false }} />
         <Text style={styles.sectionHeader}>Edit Photo</Text>
         <View style={styles.carouselWrap}>
-          <PhotoCarousel photos={[editingPhoto]} fallbackUrl={null} location={selectedLocation} />
+          <PhotoCarousel photos={[editingPhoto]} fallbackUrl={null} location={selectedLocation} forceShowAll />
         </View>
         <LocationMultiSelect label="Assign to locations" selected={editPhotoLocs} onChange={setEditPhotoLocs} showSelectAll />
         <Text style={[styles.sectionHeader, { marginTop: 20 }]}>Note (optional)</Text>
@@ -385,10 +388,16 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
           placeholderTextColor={C.textMuted}
         />
         <View style={[styles.actionRow, { marginTop: 20 }]}>
-          <TouchableOpacity style={styles.saveBtn} onPress={() => void handleSavePhotoMeta()}>
-            <Text style={styles.saveBtnText}>Save</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, savingPhotoMeta && styles.btnDisabled]}
+            onPress={() => void handleSavePhotoMeta()}
+            disabled={savingPhotoMeta}
+          >
+            {savingPhotoMeta
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.saveBtnText}>Save</Text>}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingPhoto(null)}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingPhoto(null)} disabled={savingPhotoMeta}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>

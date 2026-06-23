@@ -8,9 +8,8 @@ import {
   Switch,
   RefreshControl,
 } from 'react-native';
-import { useQueryClient } from '@tanstack/react-query';
 import { useQuizQuestions } from '../../services/quizService';
-import { QUERY_KEYS } from '../../constants/queryKeys';
+import { useHiddenPositions } from '../../services/positionSettingsService';
 import { TOPIC_LIST } from '../../constants/topics';
 import { useLocation } from '../../contexts/LocationContext';
 import type { ParsedQuestion, QuizFilters } from '../../types/quiz';
@@ -26,9 +25,9 @@ interface QuizSetupScreenProps {
 }
 
 export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
-  const queryClient = useQueryClient();
   const { location } = useLocation();
-  const { data: questions, isLoading, isError, error, refetch, dataUpdatedAt } = useQuizQuestions();
+  const { data: questions, isLoading, isError, error, refetch } = useQuizQuestions();
+  const { data: hiddenSet = new Set<string>() } = useHiddenPositions();
 
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([...TOPIC_LIST]);
@@ -44,8 +43,10 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
   const availablePositions = useMemo(() => {
     const codes = new Set<string>();
     locationQuestions.forEach((q) => q.positions.forEach((p) => codes.add(p)));
-    return POSITIONS.filter((p) => codes.has(p.code));
-  }, [locationQuestions]);
+    return POSITIONS.filter(
+      (p) => codes.has(p.code) && !hiddenSet.has(`${location}:${p.code}`),
+    );
+  }, [locationQuestions, hiddenSet, location]);
 
   const filteredCount = useMemo(() => {
     return locationQuestions.filter((q) => {
@@ -87,10 +88,6 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
   const positionRequired = availablePositions.length > 0 && selectedPositions.length === 0;
   const canStart = filteredCount > 0 && !positionRequired;
 
-  const lastRefreshed = dataUpdatedAt > 0
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : null;
-
   return (
     <ScrollView
       style={styles.scroll}
@@ -98,7 +95,7 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
       refreshControl={
         <RefreshControl
           refreshing={isLoading}
-          onRefresh={() => void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.quizQuestions })}
+          onRefresh={() => void refetch()}
           tintColor={C.primary}
         />
       }
@@ -109,14 +106,6 @@ export function QuizSetupScreen({ onStart }: QuizSetupScreenProps) {
         <Text style={styles.heroSub}>
           <Text style={styles.heroBold}>{locationQuestions.length}</Text> questions for your location
         </Text>
-        <View style={styles.heroBottom}>
-          <TouchableOpacity onPress={() => void refetch()} style={styles.refreshPill}>
-            <Text style={styles.refreshPillText}>↻  Refresh questions</Text>
-          </TouchableOpacity>
-          {lastRefreshed && (
-            <Text style={styles.refreshedAt}>Updated {lastRefreshed}</Text>
-          )}
-        </View>
       </View>
 
       {/* Position — required */}
@@ -220,18 +209,6 @@ const styles = StyleSheet.create({
   heroTitle:  { color: C.text,    fontSize: 22, fontFamily: FONT.extraBold, marginBottom: 4 },
   heroSub:    { color: C.textSub, fontSize: 14, fontFamily: FONT.regular,   marginBottom: 14 },
   heroBold:   { color: C.primary, fontFamily: FONT.bold },
-  heroBottom: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  refreshPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: C.borderBright,
-    backgroundColor: C.surface,
-  },
-  refreshPillText: { color: C.textSub, fontSize: 12, fontFamily: FONT.medium },
-  refreshedAt:     { color: C.textMuted, fontSize: 11, fontFamily: FONT.regular },
 
   sectionLabel: {
     fontSize: 11,

@@ -5,19 +5,22 @@ import { useAuth } from '../../src/features/auth/AuthContext';
 import { LoadingState } from '../../src/components/ui/LoadingState';
 import { LocationHeaderButton } from '../../src/contexts/LocationContext';
 import { ProfileScreen } from '../../src/features/profile/ProfileScreen';
+import { useUnresolvedIssueCount } from '../../src/services/reportedIssuesService';
 import { C, FONT } from '../../src/constants/theme';
 
-function ProfileButton({ onPress, initials }: { onPress: () => void; initials: string }) {
+function ProfileButton({ onPress, initials, hasUnresolved }: { onPress: () => void; initials: string; hasUnresolved: boolean }) {
   return (
     <TouchableOpacity style={styles.profileBtn} onPress={onPress} accessibilityRole="button" accessibilityLabel="Profile">
       <Text style={styles.profileBtnText}>{initials}</Text>
+      {hasUnresolved && <View style={styles.redDot} />}
     </TouchableOpacity>
   );
 }
 
 export default function TabsLayout() {
-  const { session, isLoading, fullName, user } = useAuth();
+  const { session, isLoading, fullName, user, isAdmin } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
+  const { data: unresolvedCount = 0 } = useUnresolvedIssueCount({ enabled: isAdmin });
 
   if (isLoading) return <LoadingState message="Loading…" />;
   if (!session) return <Redirect href="/(auth)/login" />;
@@ -48,7 +51,7 @@ export default function TabsLayout() {
           headerRight: () => (
             <View style={styles.headerRight}>
               <LocationHeaderButton />
-              <ProfileButton initials={initials} onPress={() => setShowProfile(true)} />
+              <ProfileButton initials={initials} onPress={() => setShowProfile(true)} hasUnresolved={isAdmin && unresolvedCount > 0} />
             </View>
           ),
         }}
@@ -102,5 +105,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: FONT.bold,
     color: C.primary,
+  },
+  redDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: C.error,
+    borderWidth: 1.5,
+    borderColor: C.surface,
   },
 });
