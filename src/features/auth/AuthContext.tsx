@@ -24,15 +24,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: null,
     isLoading: true,
   });
-  const [profile, setProfile] = useState<{ is_admin: boolean; full_name: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('is_admin, full_name')
+      .select('full_name')
       .eq('id', userId)
       .single();
-    setProfile(data as { is_admin: boolean; full_name: string | null } | null);
+    setProfile(data as { full_name: string | null } | null);
   }, []);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (state.user) await fetchProfile(state.user.id);
   }, [state.user, fetchProfile]);
 
-  const isAdmin   = profile?.is_admin ?? false;
+  const isAdmin   = state.session?.user?.app_metadata?.role === 'admin';
   const fullName  = profile?.full_name ?? null;
 
   return (
