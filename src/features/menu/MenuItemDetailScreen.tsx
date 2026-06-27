@@ -8,6 +8,7 @@ import { PhotoCarousel } from './components/PhotoCarousel';
 import { AdminEditPanel } from './AdminEditPanel';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { useAuth } from '../auth/AuthContext';
+import { LocationHeaderButton } from '../../contexts/LocationContext';
 import { C, FONT } from '../../constants/theme';
 
 interface MenuItemDetailScreenProps {
@@ -79,7 +80,7 @@ export function MenuItemDetailScreen({ item, selectedLocation, allItems, autoEdi
   return (
     <View style={styles.root}>
       {/* Restore default header when not in edit mode */}
-      <Stack.Screen options={{ headerLeft: undefined, headerTitle: '', gestureEnabled: true }} />
+      <Stack.Screen options={{ headerLeft: undefined, headerTitle: '', headerRight: () => <LocationHeaderButton />, gestureEnabled: true }} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.carouselWrap}>
@@ -244,8 +245,6 @@ const styles = StyleSheet.create({
 
   relatedSection: {
     marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
     paddingTop: 22,
   },
   relatedHeader: {

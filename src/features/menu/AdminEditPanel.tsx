@@ -1,10 +1,10 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, FlatList, TouchableOpacity,
   Alert, Modal, StyleSheet, Platform, ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack } from 'expo-router';
+import { Stack, useNavigation } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MenuItem, MenuItemFields, MenuItemOverrides, MenuItemPhoto, LocationCode } from '../../types/menu';
 import { ALL_LOCATIONS, LOCATION_NAMES } from '../../types/menu';
@@ -249,6 +249,36 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
 
   const requestCancelRef = useRef(handleRequestCancel);
   requestCancelRef.current = handleRequestCancel;
+
+  // ── Handle save ref (stable ref to avoid stale closure in header) ─────────
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  // ── Dynamic header — main panel only ─────────────────────────────────────
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (pendingUri || editingPhoto || relatedItemsOpen) return;
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity style={headerStyles.closeBtn} onPress={() => requestCancelRef.current()} accessibilityLabel="Close">
+          <Text style={headerStyles.closeIcon}>✕</Text>
+        </TouchableOpacity>
+      ),
+      headerTitle: '',
+      headerRight: () => (
+        <TouchableOpacity
+          style={headerStyles.saveBtn}
+          onPress={() => void handleSaveRef.current()}
+          disabled={saving}
+        >
+          {saving
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={headerStyles.saveBtnText}>Save</Text>}
+        </TouchableOpacity>
+      ),
+      gestureEnabled: false,
+    });
+  }, [saving, pendingUri, editingPhoto, relatedItemsOpen, navigation]);
 
   // ── Photo: pick ───────────────────────────────────────────────────────────
   const handlePickPhoto = async (source: 'camera' | 'library') => {
@@ -501,22 +531,6 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   // ── Main edit panel ───────────────────────────────────────────────────────
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{
-        headerLeft: () => <XButton onPress={() => requestCancelRef.current()} />,
-        headerTitle: '',
-        headerRight: () => (
-          <TouchableOpacity
-            style={headerStyles.saveBtn}
-            onPress={() => void handleSave()}
-            disabled={saving}
-          >
-            {saving
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={headerStyles.saveBtnText}>Save</Text>}
-          </TouchableOpacity>
-        ),
-        gestureEnabled: false,
-      }} />
 
       {/* 1. Photos — first block */}
       <Text style={styles.sectionHeader}>Photos</Text>
