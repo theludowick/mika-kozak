@@ -90,6 +90,13 @@ export function ItemFormModal({ visible, categories, items, initialCategory, ini
 
   // ── Photo picking (mirrors AdminEditPanel) ─────────────────────────────────
   const handlePickPhoto = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access is required to take photos.'); return; }
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access is required.'); return; }
+    }
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9, allowsMultipleSelection: false });

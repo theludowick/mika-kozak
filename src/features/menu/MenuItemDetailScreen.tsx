@@ -278,7 +278,6 @@ const styles = StyleSheet.create({
 
   reportBtn: {
     marginTop: 32, paddingVertical: 12, alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: C.border,
   },
   reportBtnText: { fontSize: 13, color: C.textMuted, fontFamily: FONT.regular },
 });

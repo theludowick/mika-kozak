@@ -217,6 +217,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!name.trim()) { Alert.alert('Name is required'); return; }
+    if (!hasUnsavedChanges()) { onSave(); return; }
     setSaving(true);
     try {
       const locationsToSave = itemLocations.length === ALL_LOCATIONS.length ? [] : itemLocations;
@@ -230,13 +231,13 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
         relatedIds,
       });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.menuItems });
+      setSaving(false);
       onSave();
     } catch (e) {
-      Alert.alert('Save failed', (e as Error).message);
-    } finally {
       setSaving(false);
+      Alert.alert('Save failed', (e as Error).message);
     }
-  }, [name, category, subCategory, fields, overrides, itemLocations, relatedIds, item.id, onSave, queryClient]);
+  }, [name, category, subCategory, fields, overrides, itemLocations, relatedIds, item.id, onSave, queryClient, hasUnsavedChanges]);
 
   // ── Cancel ────────────────────────────────────────────────────────────────
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
@@ -251,6 +252,13 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
 
   // ── Photo: pick ───────────────────────────────────────────────────────────
   const handlePickPhoto = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access is required to take photos.'); return; }
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access is required.'); return; }
+    }
     const result = source === 'camera'
       ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9, allowsMultipleSelection: false });
@@ -450,6 +458,7 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
         <FlatList
           data={candidateItems}
           keyExtractor={(i) => i.id}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item: relItem, index }) => {
             const selected = relatedIds.includes(relItem.csvId);
             const prevSelected = index > 0 && relatedIds.includes(candidateItems[index - 1]?.csvId ?? '');
@@ -497,12 +506,12 @@ export function AdminEditPanel({ item, selectedLocation, allItems, onSave, onCan
         headerTitle: '',
         headerRight: () => (
           <TouchableOpacity
-            style={[headerStyles.saveBtn, saving && headerStyles.saveBtnDisabled]}
+            style={headerStyles.saveBtn}
             onPress={() => void handleSave()}
             disabled={saving}
           >
             {saving
-              ? <ActivityIndicator color={C.primary} size="small" />
+              ? <ActivityIndicator color="#fff" size="small" />
               : <Text style={headerStyles.saveBtnText}>Save</Text>}
           </TouchableOpacity>
         ),
